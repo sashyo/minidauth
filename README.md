@@ -23,7 +23,7 @@ The claim is deliberately narrow:
 > **A stolen copy of your database contains nothing readable, and no key material to make it
 > readable.** Not a backup, not a dump, not a compromised app server.
 
-It is not a claim that nobody can read the data. minidauth holds the vendor root key, so whoever runs
+It is not a claim that nobody can read the data. minidauth holds the vendor rotating key, so whoever runs
 minidauth can ultimately authorise reads, and a quorum of your own operators can grant themselves the
 role that reads. Those are deliberate: access has to be recoverable and reviewable. What the design
 removes is any *single* party, especially your application, being able to do it alone.
@@ -162,10 +162,26 @@ credential is a short-lived doken bound to that browser.
 
 ### What still depends on the machine
 
-Owning the host still means holding the vendor root key, so it still means being able to act within
+Owning the host still means holding the vendor rotating key, so it still means being able to act within
 whatever policies are deployed. Signing grants at commit time removes silent forgery of arbitrary
 roles; it does not remove key possession. Run minidauth somewhere separate from the application it
 protects, and treat that host accordingly.
+
+## Vocabulary
+
+Tide's terms, briefly, because they are not guessable and the names carry meaning.
+
+| | |
+|---|---|
+| **VRK** | Vendor *rotating* key. What authorises this service to ask the network for things. It rotates, hence the name, and rotation is a normal part of the lifecycle rather than an incident response. |
+| **VVK** | Vendor key. The one data is encrypted to. It exists only as shares across the ORK network and is never assembled. |
+| **ORK** | A node in the Tide network. Each holds a share; a threshold of them together can act, none alone can. |
+| **doken** | A short-lived token the cohort signs after a Tide sign-in, bound to a key held inside the enclave. Carries the roles the network attested. EdDSA. |
+| **policy** | Signed rules the network enforces about who may do what. A policy names the models it authorises and cannot be used for anything else. |
+| **attestation unit** | A signed statement of fact the network checks a token against. A role only counts if a unit vouches for it. |
+
+The VRK and the VVK are easy to confuse and the difference matters: rotating the VRK does not touch
+stored data, because the data is encrypted to the VVK.
 
 ## Running it
 

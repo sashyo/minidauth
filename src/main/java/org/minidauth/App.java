@@ -13,7 +13,7 @@ import org.minidauth.vrk.VrkLifecycle;
 import java.nio.file.Files;
 
 /**
- * Minified TideCloak: a standalone service that owns a Tide vendor root key end to end, mints it
+ * Minified TideCloak: a standalone service that owns a Tide vendor rotating key end to end, mints it
  * against the ORK network, rotates it on the billing boundary, and uses it to sign governed policy
  * and contract deployments behind a quorum.
  */
