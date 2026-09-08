@@ -20,11 +20,11 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/n
   : "${SYSTEM_HOME_ORK:=http://localhost:1001}"
 fi
 
-export SYSTEM_HOME_ORK="${SYSTEM_HOME_ORK:-http://localhost:1001}"
-# The payer's public key. Public by definition, so it is checked in rather than treated as a
-# secret. This is the local development network's; point it at your own network's payer
-# when you run against one.
-export PAYER_PUBLIC="${PAYER_PUBLIC:-200000ceed4e0015d8c4d712943f1ce0dc95438ccfe1832d771cb6e16243871922ac1c}"
+export SYSTEM_HOME_ORK="${SYSTEM_HOME_ORK:-https://ork1.tideprotocol.com}"
+# The payer's public key. Public by definition, so it belongs in config rather than a secret store.
+# It must belong to the SAME network as SYSTEM_HOME_ORK: a payer from another network gives
+# "Payer <key> not found" from InitializeWallet and nothing more useful.
+export PAYER_PUBLIC="${PAYER_PUBLIC:-200000b967a7799ffd4476e1074777ebc83bec23a3843cb2e5ca43c83561802c8e646b}"
 export THRESHOLD_T="${THRESHOLD_T:-14}"
 export THRESHOLD_N="${THRESHOLD_N:-20}"
 export MC_PORT="${MC_PORT:-8081}"

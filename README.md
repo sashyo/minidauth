@@ -185,29 +185,126 @@ stored data, because the data is encrypted to the VVK.
 
 ## Running it
 
+### 1. Point it at a network
+
+Defaults are the public Tide network, so a clean clone needs no configuration:
+
+| | |
+|---|---|
+| `SYSTEM_HOME_ORK` | `https://ork1.tideprotocol.com` |
+| `PAYER_PUBLIC` | `200000b967a7799ffd4476e1074777ebc83bec23a3843cb2e5ca43c83561802c8e646b` |
+| `THRESHOLD_T` / `THRESHOLD_N` | `14` of `20` |
+
+`PAYER_PUBLIC` must belong to the same network as `SYSTEM_HOME_ORK`. Mismatch them and
+`InitializeWallet` answers 500 with "Payer &lt;key&gt; not found", which is all the diagnosis you get.
+If a local dev stack is running, `run.sh` detects it and uses its values instead.
+
 ```sh
-export SYSTEM_HOME_ORK=http://localhost:1001
-export MC_PUBLIC_URL=https://minidauth.example   # how a browser reaches this service
-./run.sh                                         # listens on :8081
+export MC_PUBLIC_URL=http://localhost:8081   # how a browser reaches this service
+export MC_ADMIN_TOKEN=$(openssl rand -hex 32)
+cp operators.example.json operators.json     # then edit the tokens
+mvn -q package -DskipTests
+./run.sh                                     # :8081
 ```
 
-`PAYER_PUBLIC` identifies the payer on the Tide network you are using. It is a public key, so it is
-checked into `run.sh` rather than treated as a secret, and defaults to the local development
-network's:
+### 2. Create the vendor key
 
+Needs a Tide licence, which is a Stripe subscription. The first call returns a checkout URL; the
+second finalizes once payment has landed.
+
+```sh
+curl -sX POST localhost:8081/vrk/create -H "Authorization: Bearer $OPS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"licensingTier":"FreeTier","email":"you@example.com","redirectUrl":"http://localhost:8081/console"}'
+# -> {"state":"AwaitingPayment","checkoutUrl":"https://checkout.stripe.com/..."}
+
+# open the checkout URL, subscribe, then:
+curl -sX POST localhost:8081/vrk/create -H "Authorization: Bearer $OPS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"licensingTier":"FreeTier","email":"you@example.com","redirectUrl":"http://localhost:8081/console"}'
+# -> {"state":"Created","vvkId":"e2ca6be1-..."}
 ```
-200000ceed4e0015d8c4d712943f1ce0dc95438ccfe1832d771cb6e16243871922ac1c
+
+### 3. Sign the enclave settings
+
+The enclave refuses to return to a URI it has no signature for, so register them before anyone signs
+in. Include the console itself.
+
+```sh
+curl -sX POST localhost:8081/tide/enclave/settings -H "Authorization: Bearer $OPS_TOKEN" \
+  -H 'Content-Type: application/json' -d '{
+    "regOn": true, "backupOn": false,
+    "logoUrl":  "https://yourapp.example/logo.png",
+    "imageUrl": "https://yourapp.example/bg.png",
+    "redirectUris": ["http://localhost:8081/console", "https://yourapp.example/tide-callback"],
+    "clientOrigins": ["http://localhost:8081", "https://yourapp.example"]
+  }'
 ```
 
-Override it when you point at a different network. If it is wrong, `InitializeWallet` answers 500
-with "Payer &lt;key&gt; not found", which is the clearest symptom you will get.
+`logoUrl` and `imageUrl` are required and must parse as URLs, even though they are only branding for
+the sign-in screen. Omit them and the network refuses the whole ceremony with "Image URL in vSettings
+is not a valid url", surfaced here as a bare 500.
 
-Then create the vendor key, which needs a Tide licence, and deploy an admin policy.
+### 4. Sign in as the first operator
 
-**Bootstrap order matters, and getting it wrong is not recoverable.** The VRK authorizer pack signs
-exactly one policy and is then revoked by the network, and the same pack signs the attestation units
-every doken needs. So the first admin has to sign in and be granted a role *before* the admin policy
-is deployed. Deploy it first and you are left with a key that can no longer mint dokens.
+Open `http://localhost:8081/console` and use **Sign in with Tide**. You will be told you have no
+governance role, which is correct: nobody has one yet. Note the `vuid` it shows.
+
+Tide accounts live on the ORK network, not with your vendor key. Deleting the key and starting over
+does not delete your users, and creating an account with a name you used before returns 409.
+
+### 5. Grant the first roles
+
+Through the quorum, using operator tokens. This is the only step that uses them; after it, operators
+sign in with Tide.
+
+```sh
+VUID=<from the console>
+
+CR=$(curl -sX POST localhost:8081/iga/change-requests/role -H "Authorization: Bearer $ALICE" \
+  -H 'Content-Type: application/json' \
+  -d "{\"vuid\":\"$VUID\",\"role\":\"vault-reader\"}" | jq -r .id)
+
+curl -sX POST localhost:8081/iga/change-requests/$CR/authorize -H "Authorization: Bearer $BOB"
+curl -sX POST localhost:8081/iga/change-requests/$CR/authorize -H "Authorization: Bearer $CAROL"
+curl -sX POST localhost:8081/iga/change-requests/$CR/commit    -H "Authorization: Bearer $ALICE"
+```
+
+On commit the cohort signs the attestation units that make the role real. If the network will not
+sign, the grant does not happen: there is no path that records a role this service cannot prove.
+
+Repeat for `vault-writer`, and for `governance-admin` if this operator should administer.
+
+### 6. Encrypt and decrypt
+
+Sign in again so the doken carries the new roles, then:
+
+```sh
+curl -sX POST localhost:8081/vault/encrypt -H "Authorization: Doken $DOKEN" \
+  -H 'Content-Type: application/json' -d '{"data":"a secret"}'
+# -> {"encrypted":"..."}
+
+curl -sX POST localhost:8081/vault/decrypt -H "Authorization: Doken $DOKEN" \
+  -H 'Content-Type: application/json' -d '{"encrypted":"..."}'
+# -> {"data":"a secret"}
+```
+
+Without the role you get 403, and the message says roles are granted through the quorum rather than
+by this service. That refusal is the product working.
+
+### The one ordering trap
+
+`Policy:1` and `AttestationUnit:1` sit on the same VRK authorizer pack. The network revokes that pack
+the moment it signs a policy, and `AttestationUnit:1` is what every doken needs. So:
+
+**Deploying a policy stops the key minting dokens.**
+
+If you only need `/vault/encrypt` and `/vault/decrypt`, deploy no policy at all and the key keeps
+working indefinitely. That is the recommended shape today.
+
+Policies are needed only for anonymous encryption, where a writer has no identity. Getting both on
+one key requires signing attestation units through a policy rather than through the pack, which the
+Java bindings cannot currently express.
 
 ## Licence
 
