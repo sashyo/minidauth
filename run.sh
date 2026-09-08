@@ -21,7 +21,10 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/n
 fi
 
 export SYSTEM_HOME_ORK="${SYSTEM_HOME_ORK:-http://localhost:1001}"
-export PAYER_PUBLIC="${PAYER_PUBLIC:-}"
+# The payer's public key. Public by definition, so it is checked in rather than treated as a
+# secret. This is the local development network's; point it at your own network's payer
+# when you run against one.
+export PAYER_PUBLIC="${PAYER_PUBLIC:-200000ceed4e0015d8c4d712943f1ce0dc95438ccfe1832d771cb6e16243871922ac1c}"
 export THRESHOLD_T="${THRESHOLD_T:-14}"
 export THRESHOLD_N="${THRESHOLD_N:-20}"
 export MC_PORT="${MC_PORT:-8081}"

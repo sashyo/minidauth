@@ -187,10 +187,20 @@ stored data, because the data is encrypted to the VVK.
 
 ```sh
 export SYSTEM_HOME_ORK=http://localhost:1001
-export PAYER_PUBLIC=...            # from your Tide network
 export MC_PUBLIC_URL=https://minidauth.example   # how a browser reaches this service
-./run.sh                           # listens on :8081
+./run.sh                                         # listens on :8081
 ```
+
+`PAYER_PUBLIC` identifies the payer on the Tide network you are using. It is a public key, so it is
+checked into `run.sh` rather than treated as a secret, and defaults to the local development
+network's:
+
+```
+200000ceed4e0015d8c4d712943f1ce0dc95438ccfe1832d771cb6e16243871922ac1c
+```
+
+Override it when you point at a different network. If it is wrong, `InitializeWallet` answers 500
+with "Payer &lt;key&gt; not found", which is the clearest symptom you will get.
 
 Then create the vendor key, which needs a Tide licence, and deploy an admin policy.
 
