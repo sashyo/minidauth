@@ -187,11 +187,15 @@ again does not reset your users, and reusing a username returns 409.
 **Owning the host still means holding the vendor key.** Signed grants stop silent forgery of roles;
 they do not stop someone with the machine acting within deployed policies.
 
-**Signing your own payloads is not wired up yet.** The protocol supports it: a custom request routed
+**Signing your own payloads goes through tide-js, and needs a policy.** A custom request routed
 through a policy hands your bytes to the contract before the network signs, so a policy can refuse a
-payload it does not recognise. The Java bindings cannot express that request, so minidauth does not
-offer it. There is a local signing call in the bindings, but it takes a fully reconstructed private
-key and exists only for offboarded realms, so it is deliberately not used here.
+payload it does not recognise. tide-js can build that request today; minidauth cannot, because the
+Java bindings cannot set a request name or draft. Either way it needs a deployed policy, so the
+pack constraint above applies.
+
+Do not reach for the local signing call in the Java bindings. It takes a fully reconstructed private
+key and exists only for realms that have left Tide, so using it would put a whole key in this
+process and give up the one property that matters.
 
 ## Vocabulary
 
