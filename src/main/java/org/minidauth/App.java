@@ -46,7 +46,8 @@ public final class App {
 
         // The doken's roles come from the governed grant record, the quorum-committed one, not
         // anything an application asserts about its own users.
-        TideAuthService tideAuth = new TideAuthService(keyStore, vrk, gov::rolesFor, gov::signedRoleUnitsFor);
+        TideAuthService tideAuth = new TideAuthService(keyStore, vrk, gov::rolesFor, gov::signedRoleUnitsFor,
+                gov::signAttestationUnits);
         ApiServer server = new ApiServer(config, operators, keyStore, vrk, rotation, govStore, gov, tideAuth);
         server.start();
 

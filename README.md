@@ -12,8 +12,9 @@ fork. minidauth lifts the key lifecycle and governance out of TideCloak so any a
 them.
 
 > **Status.** Identity, tokens and quorum governance work and are exercised against a live Tide
-> network. Encryption is not usable end to end yet: it needs a deployed policy, and deploying one
-> currently stops the key minting tokens. Details under "things that will bite you".
+> network. Encryption is not proven end to end yet. It needs a deployed policy, which works, but the
+> order you deploy policies in matters and getting it wrong strands the key. See "things that will
+> bite you".
 
 ## Why
 
@@ -181,18 +182,24 @@ Operators sign in at `/console` with Tide. Nothing long-lived is stored anywhere
 
 ## Things that will bite you
 
-**Encryption is not usable end to end yet.** Identity, tokens and governance work and are exercised
-against a live network. Encryption is not, and the reason is worth knowing before you plan around it.
-The only route that does not require assembling the key is the policy route, which runs in the
-browser with tide-js, and that needs a deployed policy. The Java bindings do expose local encrypt and
-decrypt calls, but they take a complete private key and do no network work at all, so they belong to
-deployments that have already reconstructed their key and left the network. This service does not use
-them and should not.
+**The first policy you deploy decides what the key can do afterwards.** The VRK's authorizer pack
+signs exactly one policy and the network then revokes it. That pack also signs attestation units,
+which every token needs, so a badly scoped first policy leaves a key that cannot mint tokens, or one
+that cannot deploy anything further.
 
-**Deploying a policy stops the key minting tokens.** `Policy:1` and `AttestationUnit:1` share one
-authorizer pack, the network revokes that pack when it signs a policy, and every token needs
-`AttestationUnit:1`. So a key can currently mint tokens or authorise encryption, and not both. That is the
-main thing standing between this and a working demonstration.
+Both problems have the same fix, because `AttestationUnit:1` and `Policy:1` each accept a policy as
+their authoriser. Make the first policy cover both, for example with the `any` wildcard, and the key
+keeps working: token minting moves onto the policy, and further policies can still be deployed. This
+is verified, a key with a policy deployed still mints tokens.
+
+Scope that first policy too narrowly and you are stuck. A policy over `AttestationUnit:1` alone
+keeps tokens working but cannot authorise deploying anything else.
+
+**Encryption is not proven end to end yet.** The route is the policy one, in the browser with
+tide-js, and it needs an encrypt policy deployed under a first policy scoped as above. The Java
+bindings also expose local encrypt and decrypt calls, but they take a complete private key and make
+no network calls at all, so they belong to deployments that have reconstructed their key and left
+the network. This service does not use them and should not.
 
 **Tide accounts outlive your vendor key.** They live on the network, so deleting the key and starting
 again does not reset your users, and reusing a username returns 409.

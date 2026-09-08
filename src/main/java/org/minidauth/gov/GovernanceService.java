@@ -75,6 +75,9 @@ public final class GovernanceService {
     /** The wildcard an admin policy uses to authorize any model. */
     private static final String ANY_MODEL = "any";
 
+    /** The model that signs attestation units, which every token depends on. */
+    private static final String UNIT_MODEL = "AttestationUnit:1";
+
     /**
      * How long a carrier awaiting admin approvals stays valid.
      *
@@ -395,6 +398,55 @@ public final class GovernanceService {
      * the same role can both reach quorum, and the second must not silently double-apply or
      * resurrect a role the first one removed.
      */
+    /** A deployed policy that can authorise attestation unit signing. */
+    public synchronized java.util.Optional<DeployedPolicy> unitPolicy() {
+        return store.policies().stream()
+                .filter(p -> p.modelIds != null
+                        && (p.modelIds.contains(UNIT_MODEL) || p.modelIds.contains(ANY_MODEL)))
+                .findFirst();
+    }
+
+    /**
+     * Ask the cohort to sign attestation units.
+     *
+     * <p>Two routes, and which one is available decides whether this key still works. The VRK's
+     * authorizer pack can sign these, but the network revokes that pack the moment it signs a
+     * policy, and every token needs attestation units. So once any policy is deployed, this has to
+     * go through a policy instead, and {@code AttestationUnit:1} accepts the Policy flow precisely
+     * so that it can.
+     *
+     * <p>The policy route is also the better one. The pack allows any unit at all; a policy runs the
+     * contract's data validation first, so it can refuse to sign units it does not recognise, which
+     * is how signing a role grant can be made to need approval while signing the config units a
+     * token needs does not.
+     */
+    public synchronized String[] signAttestationUnits(byte[][] units) throws Exception {
+        org.midgard.models.RequestExtensions.AttestationUnitSignRequest req;
+
+        java.util.Optional<DeployedPolicy> policy = unitPolicy();
+        if (policy.isPresent()) {
+            req = new org.midgard.models.RequestExtensions.AttestationUnitSignRequest(POLICY_AUTH_FLOW);
+            req.SetUnits(units);
+            req.SetPolicy(Base64.getDecoder().decode(policy.get().policyBytes));
+        } else {
+            // Bootstrap only, and only until the first policy is deployed.
+            req = new org.midgard.models.RequestExtensions.AttestationUnitSignRequest(VRK_AUTH_FLOW);
+            req.SetUnits(units);
+            vrk.authorizeRequestWithFirstAdmin(req);
+        }
+
+        var settings = vrk.store().midgardSettings();
+        settings.TraceParent = org.minidauth.vrk.Trace.current();
+        SignatureResponse response = org.midgard.Midgard.SignModel(settings, req);
+
+        if (response.Signatures == null || response.Signatures.length < units.length) {
+            throw new IllegalStateException("The Tide network returned "
+                    + (response.Signatures == null ? 0 : response.Signatures.length)
+                    + " signatures for " + units.length + " attestation units");
+        }
+        return response.Signatures;
+    }
+
     /**
      * Sign the attestation units that make a role grant real.
      *
@@ -436,21 +488,12 @@ public final class GovernanceService {
 
         byte[][] array = units.toArray(new byte[0][]);
 
-        org.midgard.models.RequestExtensions.AttestationUnitSignRequest req =
-                new org.midgard.models.RequestExtensions.AttestationUnitSignRequest("VRK:1");
-        req.SetUnits(array);
-
-        var response = vrk.signWithFirstAdmin(req);
-        if (response.Signatures == null || response.Signatures.length < array.length) {
-            throw new IllegalStateException("The Tide network returned "
-                    + (response.Signatures == null ? 0 : response.Signatures.length)
-                    + " signatures for " + array.length + " role attestation units");
-        }
+        String[] signatures = signAttestationUnits(array);
 
         java.util.List<RoleGrant.SignedUnit> out = new java.util.ArrayList<>();
         for (int i = 0; i < array.length; i++) {
             out.add(new RoleGrant.SignedUnit(
-                    Base64.getEncoder().encodeToString(array[i]), response.Signatures[i]));
+                    Base64.getEncoder().encodeToString(array[i]), signatures[i]));
         }
         return out;
     }

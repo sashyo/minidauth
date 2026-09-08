@@ -99,13 +99,30 @@ public final class TideAuthService {
      */
     private final java.util.function.Function<String, java.util.List<String[]>> signedRoleUnitsFor;
 
+    /**
+     * Asks the cohort to sign attestation units, by whichever route is currently available.
+     *
+     * <p>Owned by governance rather than here, because the choice depends on which policies are
+     * deployed: the VRK pack during bootstrap, a policy once one exists. Minting a token must not
+     * care which.
+     */
+    private final UnitSigner unitSigner;
+
+    /** Signs attestation units, returning one base64 signature per unit. */
+    @FunctionalInterface
+    public interface UnitSigner {
+        String[] sign(byte[][] units) throws Exception;
+    }
+
     public TideAuthService(VendorKeyStore store, VrkLifecycle vrk,
                            java.util.function.Function<String, java.util.Set<String>> rolesForVuid,
-                           java.util.function.Function<String, java.util.List<String[]>> signedRoleUnitsFor) {
+                           java.util.function.Function<String, java.util.List<String[]>> signedRoleUnitsFor,
+                           UnitSigner unitSigner) {
         this.store = store;
         this.vrk = vrk;
         this.rolesForVuid = rolesForVuid;
         this.signedRoleUnitsFor = signedRoleUnitsFor;
+        this.unitSigner = unitSigner;
     }
 
     // ============================================================ settings ceremony
@@ -481,16 +498,7 @@ public final class TideAuthService {
      * that speaks to the swarm is deliberately not the key that attests configuration.
      */
     private String[] signConfigUnits(byte[][] units) throws Exception {
-        AttestationUnitSignRequest req = new AttestationUnitSignRequest("VRK:1");
-        req.SetUnits(units);
-
-        SignatureResponse response = vrk.signWithFirstAdmin(req);
-        if (response.Signatures == null || response.Signatures.length < units.length) {
-            throw new IllegalStateException("The Tide network returned "
-                    + (response.Signatures == null ? 0 : response.Signatures.length)
-                    + " signatures for " + units.length + " config attestation units");
-        }
-        return response.Signatures;
+        return unitSigner.sign(units);
     }
 
     // ================================================================== vouchers
