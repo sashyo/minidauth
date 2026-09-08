@@ -137,6 +137,10 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
+> **Status:** the endpoints below are exercised against a live Tide network. The per-system notes
+> that follow are written from that API surface, not from shipped integrations: there is no Cognito
+> or Better Auth sample app yet. Treat them as the intended shape, not as a tested recipe.
+
 | | |
 |---|---|
 | `POST /tide/enclave/login-url` | where to send the user |
