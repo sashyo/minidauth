@@ -34,11 +34,19 @@ alone, especially your application.
 ## Quick start
 
 ```sh
-cp operators.example.json operators.json     # edit the tokens
-export MC_ADMIN_TOKEN=$(openssl rand -hex 32)
-export MC_PUBLIC_URL=http://localhost:8081   # how a browser reaches this service
-mvn -q package -DskipTests && ./run.sh       # :8081
+export MC_ADMIN_TOKEN=$(openssl rand -hex 32)   # bootstrap only, see below
+export MC_PUBLIC_URL=http://localhost:8081      # how a browser reaches this service
+mvn -q package -DskipTests && ./run.sh          # :8081
 ```
+
+**Why a token at all, when everything else signs in with Tide?** Because at this point nothing else
+exists. There is no vendor key, so there is no enclave to sign in to and no roles to check against.
+`MC_ADMIN_TOKEN` authorises exactly two calls, creating the key and signing the first enclave
+settings. After a person has signed in and been granted `governance-admin`, the console and the API
+take Tide sign-ins and the token has no further use. Stop exporting it.
+
+For a real quorum before Tide admins exist, `cp operators.example.json operators.json` and list your
+operators instead; with a single admin token the approval threshold is 1.
 
 Defaults point at the public Tide network, so there is nothing else to configure:
 
@@ -79,7 +87,7 @@ screen.
 **3. Sign in.** Open `http://localhost:8081/console` and use *Sign in with Tide*. It will say you
 have no governance role, which is right, since nobody does yet. Note your `vuid`.
 
-**4. Grant the first role,** through the quorum. This is the only step that uses operator tokens.
+**4. Grant the first role,** through the quorum. The last step that needs the bootstrap token.
 
 ```sh
 CR=$(curl -sX POST localhost:8081/iga/change-requests/role -H "Authorization: Bearer $ALICE" \
