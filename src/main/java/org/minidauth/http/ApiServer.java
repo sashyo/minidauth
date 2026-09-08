@@ -33,7 +33,6 @@ public final class ApiServer implements AutoCloseable {
     private final Config config;
     private final Operators operators;
     private final org.minidauth.auth.DokenOperators dokenOperators;
-    private final org.minidauth.vault.VaultService vault;
     private final VendorKeyStore keyStore;
     private final VrkLifecycle vrk;
     private final RotationScheduler rotation;
@@ -60,7 +59,6 @@ public final class ApiServer implements AutoCloseable {
                 () -> keyStore.get(VendorKeyStore.VVK_PUBLIC),
                 () -> keyStore.get(VendorKeyStore.VENDOR_ID),
                 vuid -> gov.rolesFor(vuid));
-        this.vault = new org.minidauth.vault.VaultService(keyStore);
         routes();
     }
 
@@ -450,45 +448,16 @@ public final class ApiServer implements AutoCloseable {
                             .toServiceRoles(granted).isEmpty()));
         });
 
-        // ------------------------------------------------------------------- the vault
-        //
-        // Encrypt and decrypt across the ORK cohort. Both need a doken, so there is no way in
-        // without a real Tide sign-in, and both need a role that the quorum granted, so who can read
-        // is decided by governance rather than by whoever holds a token.
-
-        /* Everything a browser needs to encrypt, served to anyone.
+        /* Encrypt and decrypt used to live here, calling Midgard.Encrypt and Midgard.Decrypt. They
+         * are gone, and it is worth saying why so nobody adds them back.
          *
-         * Publishing a policy sounds alarming and is not, but only because of the check below. A
-         * policy names the models it may authorize, and the ORK refuses a request for any other, so
-         * an encrypt-only policy cannot be turned toward decryption or key rotation no matter who
-         * holds it. What would be dangerous is publishing a policy that authorizes anything else,
-         * which is why this refuses to serve one. */
-        router.get("/vault/encrypt-policy", (ex, p) -> {
-            var policy = gov.publicEncryptPolicy().orElseThrow(() -> new Json.HttpError(404,
-                    "No encrypt-only policy is deployed. Anonymous encryption needs a policy whose "
-                    + "models are exactly [" + org.minidauth.gov.GovernanceService.ENCRYPT_MODEL + "]."));
-
-            Map<String, Object> enclave = tideAuth.enclaveConfig();
-            Json.send(ex, 200, Map.of(
-                    "vvkId", enclave.get("vvkId"),
-                    "homeOrkUrl", enclave.get("homeOrkUrl"),
-                    "policyId", policy.policyId,
-                    "policy", policy.policyBytes));
-        });
-
-        router.post("/vault/encrypt", (ex, p) -> {
-            requireVaultRole(ex, VAULT_WRITER);
-            Map<String, Object> body = Json.readBody(ex);
-            Json.send(ex, 200, Map.of(
-                    "encrypted", vault.encrypt(doken(ex), Json.requireString(body, "data"))));
-        });
-
-        router.post("/vault/decrypt", (ex, p) -> {
-            requireVaultRole(ex, VAULT_READER);
-            Map<String, Object> body = Json.readBody(ex);
-            Json.send(ex, 200, Map.of(
-                    "data", vault.decrypt(doken(ex), Json.requireString(body, "encrypted"))));
-        });
+         * Both take a COMPLETE Ed25519 private key, verify the doken against it and sign locally.
+         * They make no network calls at all. Using them would mean holding a whole vendor key in
+         * this process, which is the single thing this service exists not to do. They are for
+         * deployments that have already reconstructed their key and left the network.
+         *
+         * Encryption here goes through a policy instead, in the browser, with tide-js. The policy
+         * bytes are served openly by /vault/encrypt-policy below. */
 
         router.get("/operators", (ex, p) -> {
             authenticate(ex);
@@ -563,48 +532,6 @@ public final class ApiServer implements AutoCloseable {
             return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         } catch (java.io.IOException e) {
             throw new Json.HttpError(500, "Could not read the console assets: " + e.getMessage());
-        }
-    }
-
-    /**
-     * The roles that gate the vault.
-     *
-     * <p>Application roles, not governance ones, so they are named plainly and are the consuming
-     * system's to hand out. minidauth only enforces that the quorum granted them.
-     */
-    private static final String VAULT_WRITER = "vault-writer";
-    private static final String VAULT_READER = "vault-reader";
-
-    /**
-     * The raw doken from the request.
-     *
-     * <p>Passed on to the ORKs as the caller's proof of identity, so it is taken straight from the
-     * header rather than rebuilt: the cohort checks its signature, and anything reconstructed here
-     * would no longer verify.
-     */
-    private static String doken(HttpExchange ex) {
-        String header = ex.getRequestHeaders().getFirst("Authorization");
-        if (header == null || !header.startsWith(org.minidauth.auth.DokenOperators.SCHEME)) {
-            throw new Json.HttpError(401, "The vault needs a Tide sign-in: send 'Doken <token>'");
-        }
-        return header.substring(org.minidauth.auth.DokenOperators.SCHEME.length()).trim();
-    }
-
-    /**
-     * Require a vault role, read from the live grant record.
-     *
-     * <p>Checked against the record rather than the token's own claims so a revocation takes effect
-     * at once. A static operator token is refused outright here: the ORKs want a doken, and an
-     * operator token could not be passed on to them even if this service accepted it.
-     */
-    private void requireVaultRole(HttpExchange ex, String role) {
-        var identity = dokenOperators.verify(doken(ex))
-                .orElseThrow(() -> new Json.HttpError(401,
-                        "That doken is not valid for this vendor key, or has expired"));
-
-        if (!gov.rolesFor(identity.vuid).contains(role)) {
-            throw new Json.HttpError(403, "This identity does not hold '" + role + "'. Roles are "
-                    + "granted through the governance quorum, not by this service.");
         }
     }
 

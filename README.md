@@ -11,6 +11,10 @@ Built on the [Tide protocol](https://tide.org), and distilled from
 fork. minidauth lifts the key lifecycle and governance out of TideCloak so any auth system can use
 them.
 
+> **Status.** Identity, tokens and quorum governance work and are exercised against a live Tide
+> network. Encryption is not usable end to end yet: it needs a deployed policy, and deploying one
+> currently stops the key minting tokens. Details under "things that will bite you".
+
 ## Why
 
 Your app can already tell who someone is. What it cannot do is stop itself reading their data: the
@@ -100,17 +104,7 @@ curl -sX POST localhost:8081/iga/change-requests/$CR/commit    -H "Authorization
 
 Repeat for `vault-writer`, and `governance-admin` for anyone who should administer.
 
-**5. Encrypt and decrypt.** Sign in again so the token carries the new roles.
-
-```sh
-curl -sX POST localhost:8081/vault/encrypt -H "Authorization: Doken $DOKEN" \
-  -H 'Content-Type: application/json' -d '{"data":"a secret"}'
-
-curl -sX POST localhost:8081/vault/decrypt -H "Authorization: Doken $DOKEN" \
-  -H 'Content-Type: application/json' -d '{"encrypted":"..."}'
-```
-
-Without the role, 403. That refusal is the product working.
+**5. Encrypt and decrypt.** Not yet, and this is the honest state of the project. See below.
 
 ## How it fits
 
@@ -154,10 +148,10 @@ sign-in, and read authorisation from grants rather than from your own tables.
 | `POST /tide/enclave/login-url` | where to send the user |
 | `POST /tide/enclave/callback` | returns `{ vuid, doken, roles }` |
 | `GET /iga/grants/{vuid}` | what that identity holds |
-| `POST /vault/encrypt` and `/vault/decrypt` | the data operations |
+| `GET /vault/encrypt-policy` | the public policy a browser needs in order to encrypt |
 
 Signing is not an endpoint you call. It happens inside the operations above: the token you receive,
-and the grants behind it, are already threshold-signed by the network.
+and the grants behind it, are already signed by a threshold of nodes.
 
 **Cognito.** Add `custom:tide_vuid` to the user pool and write the vuid there after sign-in. A Pre
 Token Generation trigger can copy the vuid into the token, but copy **only** the vuid. A role that
@@ -187,11 +181,18 @@ Operators sign in at `/console` with Tide. Nothing long-lived is stored anywhere
 
 ## Things that will bite you
 
+**Encryption is not usable end to end yet.** Identity, tokens and governance work and are exercised
+against a live network. Encryption is not, and the reason is worth knowing before you plan around it.
+The only route that does not require assembling the key is the policy route, which runs in the
+browser with tide-js, and that needs a deployed policy. The Java bindings do expose local encrypt and
+decrypt calls, but they take a complete private key and do no network work at all, so they belong to
+deployments that have already reconstructed their key and left the network. This service does not use
+them and should not.
+
 **Deploying a policy stops the key minting tokens.** `Policy:1` and `AttestationUnit:1` share one
 authorizer pack, the network revokes that pack when it signs a policy, and every token needs
-`AttestationUnit:1`. If you only need `/vault/encrypt` and `/vault/decrypt`, deploy no policy and the
-key works indefinitely. Policies are only needed for anonymous encryption, where the writer has no
-identity.
+`AttestationUnit:1`. So a key can currently mint tokens or authorise encryption, and not both. That is the
+main thing standing between this and a working demonstration.
 
 **Tide accounts outlive your vendor key.** They live on the network, so deleting the key and starting
 again does not reset your users, and reusing a username returns 409.
