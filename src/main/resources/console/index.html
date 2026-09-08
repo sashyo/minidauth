@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minidauth Console</title>
+<style>
+  /*
+    Brutalist first: hard black rule, square corners, offset shadows that are solid rather than
+    blurred, uppercase tracked labels, monospace for anything a machine produced. Structure is the
+    decoration; nothing here is soft for the sake of looking soft.
+
+    The neumorphic idea survives in one place only, and inverted: controls are physically
+    displaced. A button sits on a hard offset shadow and, when pressed, moves into it and the
+    shadow disappears. That is the same "you can touch this" cue as a neumorphic extrusion, drawn
+    in a way that suits the rest of the page.
+
+    Light only, deliberately.
+  */
+  :root {
+    color-scheme: light;
+
+    --paper:  #ece9e2;
+    --card:   #f4f2ed;
+    --ink:    #0e0e0c;
+    --muted:  #625f57;
+    --rule:   #0e0e0c;
+    --hair:   #c3bfb4;
+    --signal: #d6371c;
+
+    --step: 8px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------------------------------------------------------- header */
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--step) * 2);
+    flex-wrap: wrap;
+    padding: calc(var(--step) * 2) calc(var(--step) * 3);
+    background: var(--card);
+    border-bottom: 3px solid var(--rule);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  /* ------------------------------------------------------------------ main */
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: calc(var(--step) * 4) calc(var(--step) * 3) calc(var(--step) * 8);
+    counter-reset: panel;
+  }
+
+  /* Panels are boxes with a solid displaced shadow. No blur: the edge stays legible. */
+  section {
+    background: var(--card);
+    border: 2px solid var(--rule);
+    box-shadow: 6px 6px 0 var(--rule);
+    margin-bottom: calc(var(--step) * 4);
+  }
+
+  /* The label is a filled band, not text floating above a rule. */
+  h2 {
+    counter-increment: panel;
+    display: flex;
+    align-items: baseline;
+    gap: var(--step);
+    margin: 0;
+    padding: 10px calc(var(--step) * 2);
+    background: var(--rule);
+    color: var(--card);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .18em;
+  }
+
+  h2::before {
+    content: counter(panel, decimal-leading-zero);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0;
+    opacity: .55;
+  }
+
+  .body { padding: calc(var(--step) * 2.5); }
+
+  p { margin: 0 0 var(--step); }
+  p:last-child { margin-bottom: 0; }
+
+  /* -------------------------------------------------------------- controls */
+
+  button {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 8px 14px;
+    color: var(--ink);
+    background: var(--card);
+    border: 2px solid var(--rule);
+    border-radius: 0;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--rule);
+    transition: transform .06s linear, box-shadow .06s linear;
+  }
+
+  /* Pressed means displaced: the control moves onto its own shadow. */
+  button:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: 0 0 0 var(--rule);
+  }
+
+  button:focus-visible {
+    outline: 3px solid var(--signal);
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    color: var(--muted);
+    border-color: var(--hair);
+    box-shadow: 3px 3px 0 var(--hair);
+    cursor: not-allowed;
+  }
+
+  button.primary {
+    color: var(--card);
+    background: var(--rule);
+  }
+
+  /* ---------------------------------------------------------------- tables */
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  th, td {
+    text-align: left;
+    padding: 10px calc(var(--step) * 1.5);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--ink);
+    border-bottom: 2px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  td { border-bottom: 1px solid var(--hair); }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  td button { padding: 6px 10px; box-shadow: 2px 2px 0 var(--rule); }
+  td button:active:not(:disabled) { transform: translate(2px, 2px); }
+
+  /* ------------------------------------------------------------ data + tags */
+
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+
+  /* Stamped, not raised. A tag reports state, so it must not read as pressable. */
+  .pill {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    box-shadow: inset 2px 2px 0 rgba(14,14,12,.07);
+  }
+
+  .muted { color: var(--muted); }
+  .bad   { color: var(--signal); font-weight: 700; }
+  .good  { color: #14603a; font-weight: 700; }
+  .warn  { color: #8a4b06; font-weight: 700; }
+
+  .row  { display: flex; gap: var(--step); align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1 1 auto; }
+
+  .note {
+    padding: var(--step) calc(var(--step) * 1.5);
+    margin: var(--step) 0;
+    border-left: 4px solid var(--signal);
+    background: var(--paper);
+    color: var(--muted);
+  }
+
+  /* Wide tables scroll in their own box so the page never does. */
+  .overflow { overflow-x: auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    button { transition: none; }
+    button:active:not(:disabled) { transform: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>minidauth Console</h1>
+  <span id="keyState" class="pill muted">…</span>
+  <span class="grow"></span>
+  <span id="who" class="muted"></span>
+  <button id="signIn" class="primary">Sign in with Tide</button>
+  <button id="signOut" hidden>Sign out</button>
+</header>
+
+<main>
+  <section id="introCard">
+    <h2>Why you sign in here</h2>
+    <div class="body"><p class="muted" style="margin:0">
+      This console is served by the Tide service, not by the applications it protects. Those
+      applications are what an attacker is expected to compromise, so nothing there holds a
+      credential that can grant a role. You sign in with Tide; the token is short-lived, bound to
+      this browser, and is never written to any application's database.
+    </p></div>
+  </section>
+
+  <section>
+    <h2>Change requests</h2>
+    <div class="body"><div id="changeRequests" class="overflow muted">Sign in to see pending changes.</div></div>
+  </section>
+
+  <section>
+    <h2>Role grants</h2>
+    <div class="body"><div id="grants" class="overflow muted">Sign in to see who holds what.</div></div>
+  </section>
+
+  <section>
+    <h2>Policies</h2>
+    <div class="body"><div id="policies" class="overflow muted">Sign in to see deployed policies.</div></div>
+  </section>
+</main>
+
+<script>
+/**
+ * The console holds the doken in sessionStorage and nowhere else.
+ *
+ * Not localStorage: this is a governance credential, and it should not outlive the tab or be
+ * readable by another one. Not a cookie: nothing here relies on ambient authority, and a cookie
+ * would be attached to requests this page did not make.
+ */
+const KEY = "tide.console.doken";
+const state = { doken: sessionStorage.getItem(KEY) || null, vuid: null, roles: [] };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+  if (state.doken) headers.Authorization = "Doken " + state.doken;
+  const res = await fetch(path, Object.assign({}, opts, { headers }));
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = { error: text }; }
+  if (!res.ok) throw new Error((body && body.error) || res.status + " " + res.statusText);
+  return body;
+}
+
+/* ------------------------------------------------------------------ sign-in */
+
+/**
+ * The enclave sends the operator back to this same page with the proof on the query string, so the
+ * flow resumes on load rather than in a popup. sessionId is generated here and echoed back by the
+ * enclave, which is what ties the returning proof to the request this tab started.
+ */
+async function beginSignIn() {
+  const sessionId = "console-" + crypto.randomUUID();
+  sessionStorage.setItem("tide.console.sid", sessionId);
+  const { url } = await api("/console/session/login-url", {
+    method: "POST",
+    body: JSON.stringify({ sessionId }),
+  });
+  window.location.href = url;
+}
+
+async function resumeSignIn() {
+  const params = new URLSearchParams(window.location.search);
+  const data = params.get("vendorEncryptedData");
+  if (!data) return false;
+
+  const sessionId = sessionStorage.getItem("tide.console.sid");
+  // Clean the proof out of the address bar before anything else: it is single-use, and leaving it
+  // there invites a refresh that fails confusingly.
+  history.replaceState({}, "", window.location.pathname);
+
+  try {
+    const res = await api("/console/session/callback", {
+      method: "POST",
+      body: JSON.stringify({ encryptedVendorData: data, sessionId }),
+    });
+    state.doken = res.doken;
+    state.vuid = res.vuid;
+    state.roles = res.roles || [];
+    sessionStorage.setItem(KEY, res.doken);
+
+    if (!res.canGovern) {
+      // The confusing case, named explicitly: a valid Tide identity with no governance role.
+      $("who").innerHTML = '<span class="warn">Signed in, but no governance role</span>';
+    }
+    return true;
+  } catch (e) {
+    $("who").innerHTML = '<span class="bad">' + esc(e.message) + "</span>";
+    return false;
+  }
+}
+
+function signOut() {
+  sessionStorage.removeItem(KEY);
+  location.reload();
+}
+
+/* ------------------------------------------------------------------ views */
+
+async function loadKeyState() {
+  try {
+    const h = await (await fetch("/health")).json();
+    $("keyState").textContent = "key: " + h.vendorKeyState + " · licence: " + h.licenseState;
+  } catch {
+    $("keyState").textContent = "service unreachable";
+    $("keyState").className = "pill bad";
+  }
+}
+
+function renderChangeRequests(list) {
+  if (!list.length) return '<p class="muted">Nothing pending.</p>';
+  return `<table><thead><tr>
+      <th>Kind</th><th>Requested by</th><th>Approvals</th><th>Status</th><th></th>
+    </tr></thead><tbody>` +
+    list.map((cr) => `<tr>
+      <td>${esc(cr.kind)}</td>
+      <td class="mono">${esc(cr.requestedBy)}</td>
+      <td>${(cr.approvals || []).length} of ${esc(cr.threshold ?? "?")}</td>
+      <td>${esc(cr.status)}</td>
+      <td class="row">
+        <button data-approve="${esc(cr.id)}">Approve</button>
+        ${cr.kind === "DEPLOY_POLICY"
+          ? `<button data-sign="${esc(cr.id)}">Sign in enclave</button>` : ""}
+        <button data-commit="${esc(cr.id)}">Commit</button>
+      </td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+function renderGrants(list) {
+  if (!list.length) return '<p class="muted">No roles granted.</p>';
+  return `<table><thead><tr><th>Identity</th><th>Roles</th></tr></thead><tbody>` +
+    list.map((g) => `<tr>
+      <td class="mono">${esc((g.vuid || "").slice(0, 16))}…</td>
+      <td>${(g.roles || []).map((r) => '<span class="pill">' + esc(r) + "</span>").join(" ")}</td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+function renderPolicies(list) {
+  if (!list.length) {
+    return '<p class="muted">No policies deployed. Until a decrypt policy exists and is proven to ' +
+           'work, nothing encrypted under this key can be read back.</p>';
+  }
+  return `<table><thead><tr>
+      <th>Name</th><th>Models</th><th>Approval</th><th>Execution</th>
+    </tr></thead><tbody>` +
+    list.map((p) => `<tr>
+      <td>${esc(p.name)}</td>
+      <td class="mono">${esc((p.modelIds || []).join(", "))}</td>
+      <td>${esc(p.approvalType)}</td>
+      <td>${esc(p.executionType)}</td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+async function refresh() {
+  if (!state.doken) return;
+
+  $("signIn").hidden = true;
+  $("signOut").hidden = false;
+  if (state.vuid) {
+    $("who").innerHTML = '<span class="mono">' + esc(state.vuid.slice(0, 16)) + "…</span> " +
+      state.roles.map((r) => '<span class="pill">' + esc(r) + "</span>").join(" ");
+  }
+
+  const panes = [
+    ["/iga/change-requests", "changeRequests", renderChangeRequests],
+    ["/iga/grants", "grants", renderGrants],
+    ["/iga/policies", "policies", renderPolicies],
+  ];
+
+  // Loaded independently so one refusal does not blank the whole page, an operator with only the
+  // approver role can still see change requests even if another pane is denied to them.
+  for (const [path, target, render] of panes) {
+    try {
+      $(target).innerHTML = render(await api(path) || []);
+    } catch (e) {
+      $(target).innerHTML = '<p class="bad">' + esc(e.message) + "</p>";
+    }
+  }
+}
+
+/* ------------------------------------------------------- enclave approval */
+
+/**
+ * Approving a policy happens inside the enclave, not here.
+ *
+ * The console never sees the session key the doken is bound to; the enclave holds it in its own
+ * origin's storage and will only add an approval if it can match the key to the signed-in vuid.
+ * So this is a message channel, and every payload rides in `message` because that is the only
+ * field the enclave's listener reads.
+ *
+ * A popup rather than an iframe: the enclave posts back to window.opener, and the operator has to
+ * see and confirm what they are approving, which is the point of the step.
+ */
+const ENCLAVE_TIMEOUT_MS = 120000;
+
+function b64ToBytes(b64) {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+function bytesToB64(bytes) {
+  let s = "";
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
+
+async function approveInEnclave(changeRequestId) {
+  const { carrier } = await api(
+    `/iga/change-requests/${encodeURIComponent(changeRequestId)}/carrier`
+  );
+  const cfg = await api("/tide/enclave/config");
+  const { clientOriginAuth } = await api(
+    `/tide/enclave/origin-signature?origin=${encodeURIComponent(window.location.origin)}`
+  );
+
+  const url = new URL(cfg.homeOrkUrl);
+  url.searchParams.set("type", "approval");
+  url.searchParams.set("vendorId", cfg.vvkId);
+  // Encoded once here; the enclave decodeURIComponent()s both before verifying the signature.
+  url.searchParams.set("origin", encodeURIComponent(window.location.origin));
+  url.searchParams.set("originsig", encodeURIComponent(clientOriginAuth));
+
+  const enclaveOrigin = new URL(cfg.homeOrkUrl).origin;
+  // Opened synchronously off the operator's click, or the browser blocks it.
+  const popup = window.open(url.toString(), "tide-approval", "width=520,height=760");
+  if (!popup) throw new Error("The approval window was blocked. Allow popups for this page.");
+
+  return new Promise((resolve, reject) => {
+    let done = false;
+
+    const finish = (fn, arg) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      try { popup.close(); } catch { /* already gone */ }
+      fn(arg);
+    };
+
+    const timer = setTimeout(
+      () => finish(reject, new Error("The enclave did not answer in time")),
+      ENCLAVE_TIMEOUT_MS
+    );
+
+    async function onMessage(ev) {
+      if (ev.origin !== enclaveOrigin) return;
+      const data = ev.data;
+      if (!data || typeof data.type !== "string") return;
+
+      try {
+        if (data.type === "pageLoaded") {
+          popup.postMessage({ type: "init", message: { doken: state.doken } }, enclaveOrigin);
+          return;
+        }
+
+        if (data.type === "init done") {
+          popup.postMessage({
+            type: "approvalRequests",
+            message: {
+              requests: [{
+                id: changeRequestId,
+                request: b64ToBytes(carrier),
+                names: [],
+              }],
+            },
+          }, enclaveOrigin);
+          return;
+        }
+
+        if (data.type === "approvals") {
+          const entry = (data.message || [])[0];
+          if (!entry || entry.status !== "approved" || !entry.request) {
+            finish(reject, new Error(
+              entry && entry.status === "denied" ? "Approval was declined" : "Nothing was approved"
+            ));
+            return;
+          }
+          // Handed back exactly as the enclave left it. The doken it added signs these bytes, so
+          // re-encoding them would void the approval.
+          await api(`/iga/change-requests/${encodeURIComponent(changeRequestId)}/carrier`, {
+            method: "POST",
+            body: JSON.stringify({ carrier: bytesToB64(entry.request) }),
+          });
+          finish(resolve, true);
+          return;
+        }
+
+        if (data.type === "hidden enclave" || data.type === "error") {
+          finish(reject, new Error("Enclave: " + data.message));
+        }
+      } catch (e) {
+        finish(reject, e);
+      }
+    }
+
+    window.addEventListener("message", onMessage, false);
+  });
+}
+
+document.addEventListener("click", async (ev) => {
+  const approve = ev.target.getAttribute?.("data-approve");
+  const commit = ev.target.getAttribute?.("data-commit");
+  const sign = ev.target.getAttribute?.("data-sign");
+  if (!approve && !commit && !sign) return;
+
+  const label = ev.target.textContent;
+  ev.target.disabled = true;
+  try {
+    if (sign) {
+      // A policy needs a Tide administrator's doken, added inside the enclave.
+      ev.target.textContent = "Approving…";
+      await approveInEnclave(sign);
+    } else {
+      const id = approve || commit;
+      await api(`/iga/change-requests/${encodeURIComponent(id)}/${approve ? "authorize" : "commit"}`,
+        { method: "POST" });
+    }
+    await refresh();
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    ev.target.disabled = false;
+    ev.target.textContent = label;
+  }
+});
+
+$("signIn").addEventListener("click", () => beginSignIn().catch((e) => alert(e.message)));
+$("signOut").addEventListener("click", signOut);
+
+(async function start() {
+  await loadKeyState();
+  await resumeSignIn();
+  await refresh();
+})();
+</script>
+</body>
+</html>

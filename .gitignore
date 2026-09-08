@@ -1,0 +1,12 @@
+# Vendor key material and all governance state. Never publish: the data directory holds the VRK.
+data/
+data.bak*/
+
+# Operator tokens. The sample lives in operators.example.json.
+operators.json
+
+target/
+*.class
+
+.playwright-mcp/
+*.png
