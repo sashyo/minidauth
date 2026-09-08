@@ -8,7 +8,7 @@ decides who may decrypt.
 
 Built on the [Tide protocol](https://tide.org), and distilled from
 [TideCloak](https://github.com/tide-foundation/tidecloak), which does all of this inside a Keycloak
-fork. minidauth lifts the key lifecycle and governance out of Keycloak so any auth system can use
+fork. minidauth lifts the key lifecycle and governance out of TideCloak so any auth system can use
 them.
 
 ## Why
@@ -18,6 +18,11 @@ database holds the rows, the app holds the key, and taking the machine takes bot
 
 minidauth moves the key out. It exists only as shares spread across the Tide network, no single node
 can reconstruct it, and decryption is authorised by a policy the network enforces.
+
+The same key **signs** as well as encrypts, and signing is the busier half. Every sign-in token,
+every policy, every role grant and every settings change is an EdDSA signature produced jointly by a
+threshold of nodes. Nothing minidauth issues is signed locally, which is why a compromised host
+cannot forge a role or mint a token that the network will accept.
 
 > **A stolen copy of your database contains nothing readable, and no key to make it readable.**
 
@@ -139,6 +144,9 @@ sign-in, and read authorisation from grants rather than from your own tables.
 | `GET /iga/grants/{vuid}` | what that identity holds |
 | `POST /vault/encrypt` and `/vault/decrypt` | the data operations |
 
+Signing is not an endpoint you call. It happens inside the operations above: the token you receive,
+and the grants behind it, are already threshold-signed by the network.
+
 **Cognito.** Add `custom:tide_vuid` to the user pool and write the vuid there after sign-in. A Pre
 Token Generation trigger can copy the vuid into the token, but copy **only** the vuid. A role that
 arrives via a Cognito trigger is a role your AWS account can mint, which puts you back where you
@@ -178,6 +186,12 @@ again does not reset your users, and reusing a username returns 409.
 
 **Owning the host still means holding the vendor key.** Signed grants stop silent forgery of roles;
 they do not stop someone with the machine acting within deployed policies.
+
+**Signing your own payloads is not wired up yet.** The protocol supports it: a custom request routed
+through a policy hands your bytes to the contract before the network signs, so a policy can refuse a
+payload it does not recognise. The Java bindings cannot express that request, so minidauth does not
+offer it. There is a local signing call in the bindings, but it takes a fully reconstructed private
+key and exists only for offboarded realms, so it is deliberately not used here.
 
 ## Vocabulary
 
