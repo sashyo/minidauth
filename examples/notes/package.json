@@ -1,0 +1,7 @@
+{
+  "name": "minidauth-notes-demo",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node --env-file-if-exists=.env server.js" },
+  "dependencies": { "cookie-parser": "^1.4.7", "express": "^4.21.2" }
+}

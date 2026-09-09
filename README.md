@@ -274,8 +274,12 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-Five of them, in [examples](examples), and the point of having several is that the minidauth half
-never changes. It is the same file in all four. Authentication stays where it is; authorisation comes
+**[examples/notes](examples/notes) is the one to look at first.** Write a note, watch it get
+encrypted inside the enclave, then read the database and find nothing but ciphertext. It is the
+claim at the top of this file, made checkable in a page.
+
+The rest are integrations, and the point of having several is that the minidauth half never
+changes. It is the same file in all four. Authentication stays where it is; authorisation comes
 from the grant record on every request rather than from the app's own database.
 
 | | |

@@ -1,0 +1,214 @@
+<!doctype html><meta charset="utf-8">
+<title>minidauth notes</title>
+<style>
+  :root { --paper:#ece9e2; --ink:#0e0e0c; --signal:#d6371c; --sunk:#dedbd4; }
+  body{margin:0;padding:32px;background:var(--paper);color:var(--ink);max-width:940px;
+       font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+  h1{font-size:15px;text-transform:uppercase;letter-spacing:.12em;background:var(--ink);
+     color:var(--paper);display:inline-block;padding:6px 10px;margin:0 0 6px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin:26px 0 8px}
+  button,input,textarea{font:inherit;border:2px solid var(--ink);background:var(--paper);
+     color:inherit;padding:8px 10px}
+  button{cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+  button:active{transform:translate(3px,3px);box-shadow:none}
+  button[disabled]{opacity:.45;cursor:default;box-shadow:none}
+  input,textarea{width:100%;box-sizing:border-box}
+  .card{border:2px solid var(--ink);padding:14px;margin:0 0 14px;box-shadow:6px 6px 0 var(--ink)}
+  .pill{border:2px solid var(--ink);padding:1px 8px;font-size:13px}
+  .no{color:var(--signal)}
+  pre{white-space:pre-wrap;word-break:break-all;background:var(--sunk);padding:10px;margin:8px 0 0;
+      border:2px solid var(--ink);max-height:230px;overflow:auto;font-size:13px}
+  .muted{opacity:.65}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+</style>
+
+<h1>minidauth notes</h1>
+<p class="muted">Every note is encrypted inside the Tide enclave before it leaves your browser. This
+server stores what it is given and cannot read any of it.</p>
+
+<div id="who" class="card"></div>
+
+<div id="app" hidden>
+  <h2>Write a note</h2>
+  <div class="card">
+    <p><input id="title" placeholder="title" value="bank details"></p>
+    <p><textarea id="body" rows="3">sort code 04-00-04, account 12345678</textarea></p>
+    <div class="row">
+      <button id="save">Encrypt and store</button>
+      <span id="saveState" class="muted"></span>
+    </div>
+  </div>
+
+  <h2>Stored notes</h2>
+  <div id="notes"></div>
+
+  <h2>What the database actually contains</h2>
+  <p class="muted">The file this server writes, verbatim. This is what a stolen copy looks like.</p>
+  <pre id="raw">loading…</pre>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const api = (p, o) => fetch(p, o).then((r) => r.json());
+const b64ToBytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+const bytesToB64 = (b) => { let s=""; const u=new Uint8Array(b);
+  for (let i=0;i<u.length;i++) s+=String.fromCharCode(u[i]); return btoa(s); };
+
+let me = null, enclaveCfg = null;
+
+/* One enclave window, kept open for the page's lifetime.
+ *
+ * The session key lives in there and never leaves it, so reopening would mean signing in again and
+ * a doken bound to a different key. */
+let enclave = null;
+function openEnclave() {
+  if (enclave && !enclave.win.closed) return enclave.ready;
+
+  const url = new URL(enclaveCfg.homeOrkUrl);
+  url.searchParams.set("type", "request");
+  url.searchParams.set("hidden", "false");
+  url.searchParams.set("vendorId", enclaveCfg.vvkId);
+  url.searchParams.set("origin", encodeURIComponent(location.origin));
+  url.searchParams.set("originsig", encodeURIComponent(enclaveCfg.clientOriginAuth));
+  url.searchParams.set("voucherURL", encodeURIComponent(enclaveCfg.voucherUrl));
+
+  const origin = new URL(enclaveCfg.homeOrkUrl).origin;
+  const win = window.open(url.toString(), "tide-enclave", "width=520,height=760");
+  if (!win) throw new Error("The enclave window was blocked. Allow popups for this page.");
+
+  const sessionId = Array.from(crypto.getRandomValues(new Uint32Array(5)),
+    (v) => v.toString(16).padStart(8, "0")).join("");
+  const waiters = new Map();
+
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("the enclave did not answer")), 120000);
+    window.addEventListener("message", (ev) => {
+      if (ev.origin !== origin) return;
+      const { type, message } = ev.data ?? {};
+      if (type === "session check") {
+        win.postMessage({ type: "current session", message: sessionId }, origin);
+        return;
+      }
+      if (type === "pageLoaded") {
+        win.postMessage({ type: "init", message: { doken: me.doken, sessionId } }, origin);
+        return;
+      }
+      if (type === "init done") { clearTimeout(timer); resolve(); return; }
+      const waiter = waiters.get(type);
+      if (waiter) {
+        waiters.delete(type);
+        if (message?.error) waiter.reject(new Error(message.error));
+        else waiter.resolve(message);
+      }
+    });
+  });
+
+  const ask = (msg, replyType) => new Promise((resolve, reject) => {
+    waiters.set(replyType, { resolve, reject });
+    win.postMessage({ type: "request", message: msg }, origin);
+  });
+
+  enclave = { win, ready, ask };
+  return ready;
+}
+
+async function encrypt(text) {
+  await openEnclave();
+  const out = await enclave.ask({
+    flow: "policy encrypt",
+    request: [{ data: new TextEncoder().encode(text), tags: ["note"] }],
+    policy: b64ToBytes(enclaveCfg.encryptPolicy),
+  }, "encrypt request completed");
+  const first = Array.isArray(out) ? out[0] : out;
+  return bytesToB64(first instanceof Uint8Array ? first : new Uint8Array(first));
+}
+
+async function decrypt(ciphertext) {
+  if (!enclaveCfg.decryptPolicy) throw new Error("no decryption policy is deployed");
+  await openEnclave();
+  const out = await enclave.ask({
+    flow: "policy decrypt",
+    request: [{ encrypted: b64ToBytes(ciphertext), tags: ["note"] }],
+    policy: b64ToBytes(enclaveCfg.decryptPolicy),
+  }, "decrypt request completed");
+  const first = Array.isArray(out) ? out[0] : out;
+  return typeof first === "string" ? first
+    : new TextDecoder().decode(first instanceof Uint8Array ? first : new Uint8Array(first));
+}
+
+function renderWho() {
+  if (!me?.signedIn) {
+    $("who").innerHTML = `<p>Not signed in. Your identity is proven by the Tide network, and the
+      roles that decide what you may read are granted by a quorum, not by this app.</p>
+      <button id="signin">Sign in with Tide</button>`;
+    $("signin").onclick = async () => {
+      const { url, error } = await api("/api/login-url");
+      if (error) return alert(error);
+      location.href = url;
+    };
+    $("app").hidden = true;
+    return;
+  }
+  $("who").innerHTML = `<div class="row">
+      <span class="mono">${me.vuid.slice(0, 16)}…</span>
+      ${me.roles.length ? me.roles.map((r) => `<span class="pill">${r}</span>`).join(" ")
+        : '<span class="no">no roles granted</span>'}
+      <button id="out">Sign out</button>
+    </div>
+    ${me.canRead ? "" : `<p class="no">Without <code>vault-reader</code> the network will refuse to
+      decrypt these notes, no matter what this app asks.</p>`}`;
+  $("out").onclick = async () => { await api("/api/logout"); location.reload(); };
+  $("app").hidden = false;
+}
+
+async function renderNotes() {
+  const notes = await api("/api/notes");
+  $("notes").innerHTML = notes.length ? "" : '<p class="muted">Nothing stored yet.</p>';
+  for (const n of notes) {
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = `<div class="row"><strong>${n.title}</strong>
+        <span class="muted">by ${n.author}… ${new Date(n.createdAt).toLocaleString()}</span></div>
+      <pre>${n.ciphertext.slice(0, 200)}${n.ciphertext.length > 200 ? "…" : ""}</pre>
+      <div class="row"><button data-id="${n.id}">Decrypt in the enclave</button>
+        <span class="out muted"></span></div>`;
+    const btn = el.querySelector("button");
+    const out = el.querySelector(".out");
+    btn.onclick = async () => {
+      btn.disabled = true; out.textContent = "asking the network…"; out.className = "out muted";
+      try {
+        out.textContent = await decrypt(n.ciphertext);
+        out.className = "out";
+      } catch (e) {
+        out.textContent = "refused: " + e.message;
+        out.className = "out no";
+      } finally { btn.disabled = false; }
+    };
+    $("notes").append(el);
+  }
+  $("raw").textContent = await fetch("/api/raw").then((r) => r.text());
+}
+
+$("save") && ($("save").onclick = async () => {
+  const btn = $("save"); btn.disabled = true;
+  $("saveState").textContent = "encrypting in the enclave…";
+  try {
+    const ciphertext = await encrypt($("body").value);
+    await fetch("/api/notes", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: $("title").value, ciphertext }),
+    });
+    $("saveState").textContent = "stored as ciphertext";
+    await renderNotes();
+  } catch (e) {
+    $("saveState").textContent = "failed: " + e.message;
+  } finally { btn.disabled = false; }
+});
+
+me = await api("/api/me");
+renderWho();
+if (me.signedIn) {
+  enclaveCfg = await api("/api/enclave");
+  await renderNotes();
+}
+</script>

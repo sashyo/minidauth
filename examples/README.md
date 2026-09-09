@@ -3,6 +3,12 @@
 Four auth systems, one integration. The point of having several is that the minidauth part does not
 change: [`shared/minidauth.js`](shared/minidauth.js) is the same file in all of them.
 
+**Start here: [notes](notes)**, which is the only one that shows what minidauth is for rather than
+how to wire it in. You write a note, it is encrypted in the enclave, and the page shows you the
+database containing nothing but ciphertext.
+
+The rest are integrations. Same three steps in each, with a different login provider:
+
 | | | |
 |---|---|---|
 | [better-auth](better-auth) | :3000 | Runs locally, exercised against the live network |
