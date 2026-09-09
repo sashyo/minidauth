@@ -44,6 +44,38 @@ That is the install. Details in [quick start](#quick-start).
 | **Role grants that need more than one person** | A grant is filed, approved by administrators in their own enclaves, and only then does the network sign the attestations that make it real. |
 | **Your auth system untouched** | Store one extra column, a `vuid`, and add one callback route. |
 
+## The easy way into Tide
+
+[Tide](https://tide.org) is a security fabric, not a login box. A network of independent nodes holds
+key shares and will perform cryptography on your behalf without any of them, or you, ever holding a
+whole key. Signing, encryption and the rules about who may do either are enforced by that network
+rather than by your server.
+
+The catch has always been the way in. Adopting it meant adopting
+[TideCloak](https://github.com/tide-foundation/tidecloak), a Keycloak fork that does all of this
+properly and completely, and replacing your identity system to get there. That is a big first step
+for a team that just wants their database to stop being a single point of failure.
+
+minidauth is the small door. It lifts the key lifecycle and the governance out of TideCloak and puts
+them behind a plain HTTP service, so you keep the login you already have and add the fabric beside
+it. One service, one extra column on your user table, one callback route.
+
+What you get on the first day:
+
+- A vendor key created, licensed and rotated on the Tide network, never assembled anywhere.
+- Encryption and decryption gated by policies the network enforces.
+- Role grants that a quorum approves and the network attests.
+
+What the fabric gives you as you go further: signing your own payloads under policy, contracts that
+decide what may be signed at all, and an offboarding path that is the only time keys are ever made
+whole. If you grow into needing all of it, TideCloak is the full expression and this was never a
+dead end, it is the same network and the same vendor key.
+
+**The claim at the top is deliberately narrow.** Whoever runs minidauth holds the vendor key and can
+ultimately authorise reads, and a quorum of your own operators can grant themselves the reading
+role. Both are on purpose, because access has to be recoverable. What goes away is any *single*
+party doing it alone, especially your application.
+
 ## Honestly, what is proven
 
 Everything above runs against the public Tide network, not a simulator:
@@ -71,18 +103,6 @@ sharing your problem. minidauth keeps recovery possible through a quorum, withou
 being able to read alone.
 
 **Envelope encryption in your app** still ends with a data key in the process that holds the data.
-
-## Why it exists
-
-Built on the [Tide protocol](https://tide.org) and distilled from
-[TideCloak](https://github.com/tide-foundation/tidecloak), which does all of this inside a Keycloak
-fork. If you are happy to run that fork, run it. minidauth lifts the key lifecycle and the
-governance out, so an existing auth system can have the same property without being replaced.
-
-That claim at the top is deliberately narrow. Whoever runs minidauth holds the vendor key and can
-ultimately authorise reads, and a quorum of your own operators can grant themselves the reading
-role. Both are on purpose, because access has to be recoverable. What goes away is any *single*
-party doing it alone, especially your application.
 
 ## Quick start
 
