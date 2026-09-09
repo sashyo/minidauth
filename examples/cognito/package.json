@@ -1,0 +1,12 @@
+{
+  "name": "minidauth-cognito-example",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.700.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jose": "^5.9.6"
+  }
+}

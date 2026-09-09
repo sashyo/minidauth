@@ -87,9 +87,9 @@ Everything above runs against the public Tide network, not a simulator:
   authorisation from the quorum.
 
 What is not: policy *deployment* is still gated by this service rather than the network, for a
-reason explained under [governance](#what-the-network-enforces-and-what-this-service-does). And
-there is no Cognito sample app, so those notes are written from the API surface. Better Auth has a
-runnable one in [examples/better-auth](examples/better-auth).
+reason explained under [governance](#what-the-network-enforces-and-what-this-service-does). And the
+[Cognito example](examples/cognito) has not been run against a real user pool yet, though the
+minidauth half of it is the same code as the Better Auth one.
 
 The order you do things in matters more than anything else here, and getting it wrong strands the
 key permanently. Follow the quick start in order and read "things that will bite you".
@@ -252,10 +252,13 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-There is a runnable example: [examples/better-auth](examples/better-auth). It keeps Better Auth's
-accounts and passwords untouched, links a Tide identity to a user, and reads authorisation from the
-grant record on every request rather than from its own database. The Cognito notes below are written
-from the same API surface but have no sample app behind them yet.
+Two runnable examples, and both make the same point: authentication stays where it is, and
+authorisation comes from the grant record on every request rather than from the app's own database.
+
+| | |
+|---|---|
+| [examples/better-auth](examples/better-auth) | Runs locally, exercised against the live network |
+| [examples/cognito](examples/cognito) | Written from the API, not yet run against a real user pool |
 
 | | |
 |---|---|
