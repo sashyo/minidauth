@@ -1,16 +1,25 @@
 # minidauth notes
 
-The demo that shows what minidauth is actually for.
+The demo that shows what minidauth is for. Encryption is the part you can see, but it is not the
+point on its own.
 
-Write a note. It is encrypted inside the Tide enclave before it leaves your browser, and this server
-stores what it is handed. The server has no key, holds no key, and cannot be persuaded to read a
-note, because the decision is not its to make.
+![The demo](docs/demo.gif)
 
-![The demo](docs/demo.png)
+Five frames, five different things, none of which this app decides for itself:
 
-Look at the bottom panel. That is the file this server writes, printed verbatim. **That is what a
-stolen copy of the database contains**, and there is no key anywhere in the system that would turn
-it back into text on its own.
+| | |
+|---|---|
+| **No password here** | There is no user table and no login form. Identity is proven by the Tide network. |
+| **The enclave** | The password is typed into a page served by the ORKs. Neither this app nor minidauth ever sees it. |
+| **Roles arrive from a quorum** | `vault-reader` was granted by administrators approving in their own enclaves, and the network signed the attestations that make it real. This app cannot grant itself anything. |
+| **The database holds ciphertext** | Encrypted inside the enclave before it left the browser. The bottom panel is the file this server writes, printed verbatim. |
+| **Reading is permission, not capability** | Decryption happens under a policy the ORKs enforce. Without the role they refuse, and nothing this app asks changes that. |
+
+Behind all of it, and invisible in any screenshot: every token, policy and role grant here was signed
+jointly by a threshold of independent nodes. Nothing was signed on this machine, which is why owning
+this machine does not let you forge a role or mint a token the network will accept.
+
+> **A stolen copy of the database contains nothing readable, and no key to make it readable.**
 
 ## What each part is proving
 

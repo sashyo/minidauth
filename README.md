@@ -17,11 +17,17 @@ Your app can already tell who someone is. What it cannot do is stop itself readi
 database holds the rows, the app holds the key, and taking the machine takes both.
 
 minidauth moves the key out. It exists only as shares spread across the [Tide](https://tide.org)
-network, no single node can reconstruct it, and every decryption is authorised by a policy the
-network enforces. Your login stays exactly where it is: Cognito, Better Auth, Keycloak, Auth.js,
-whatever you already run.
+network, and no single node can reconstruct it. That key signs every token, policy and role grant
+your system issues, and decides who may decrypt, and none of those decisions are your server's to
+make. Your login stays exactly where it is: Cognito, Better Auth, Keycloak, Auth.js, whatever you
+already run.
 
 > **A stolen copy of your database contains nothing readable, and no key to make it readable.**
+
+![minidauth in a minute](examples/notes/docs/demo.gif)
+
+That is the [notes demo](examples/notes). No password, no user table, roles granted by a quorum, and
+a database holding nothing but ciphertext.
 
 The same key signs as well as encrypts, and signing is the busier half. Every sign-in token, every
 policy, every role grant is an EdDSA signature produced jointly by a threshold of nodes. Nothing is
@@ -40,9 +46,15 @@ That is the install. Details in [quick start](#quick-start).
 | | |
 |---|---|
 | **A key that is never assembled** | Not "stored in an HSM", not "held by a service". It exists as shares, and a threshold of independent nodes cooperate to use it. There is no moment where the whole key exists. |
-| **Reads decided by policy, not by your code** | The ORKs check the caller's role against a signed policy before they will help decrypt. Your app cannot decide to read; it can only ask. |
+| **Every signature is a joint one** | Sign-in tokens, policies, role grants. Nothing minidauth issues is signed on your server, so taking the server does not let you forge a role or mint a token the network accepts. |
+| **Identity you did not have to hold** | Sign-in happens in the ORKs' own enclave. No password reaches your application or this service, so there is none to leak. |
 | **Role grants that need more than one person** | A grant is filed, approved by administrators in their own enclaves, and only then does the network sign the attestations that make it real. |
+| **Reads decided by policy, not by your code** | The ORKs check the caller's role against a signed policy before they will help decrypt. Your app cannot decide to read; it can only ask. |
 | **Your auth system untouched** | Store one extra column, a `vuid`, and add one callback route. |
+
+Encryption is the visible one, and the easiest to check, which is why the demo leads with it. It is
+not the whole of what the key does: signing is the busier half, and it is what makes a role grant or
+a policy something your own server cannot fake.
 
 ## The easy way into Tide
 
