@@ -1,13 +1,19 @@
 # Examples
 
-Four auth systems, one integration. The point of having several is that the minidauth part does not
-change: [`shared/minidauth.js`](shared/minidauth.js) is the same file in all of them.
+## Start here
 
-**Start here: [notes](notes)**, which is the only one that shows what minidauth is for rather than
-how to wire it in. You write a note, it is encrypted in the enclave, and the page shows you the
-database containing nothing but ciphertext.
+**[notes](notes)** is the only one that shows what minidauth is *for* rather than how to wire it in.
+Write a note and it is encrypted inside the enclave; the page then prints the database so you can see
+it holds nothing but ciphertext. It also asks the network to sign a payment and gets refused for
+being over the policy's limit, which is the part encryption cannot do.
 
-The rest are integrations. Same three steps in each, with a different login provider:
+![The demo](notes/docs/demo.gif)
+
+## Then the integrations
+
+Five auth systems, one integration. The point of having several is that the minidauth part does not
+change: [`shared/minidauth.js`](shared/minidauth.js) is the same file in all of them. Same three
+steps in each, with a different login provider:
 
 | | | |
 |---|---|---|
