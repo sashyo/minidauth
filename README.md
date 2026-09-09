@@ -1,43 +1,88 @@
-# minidauth
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="minidauth" width="380">
+  </picture>
+</p>
 
-**Mini decentralised auth.** A small service that gives your existing auth system a key nobody holds.
+<p align="center"><strong>Give your existing login a key that nobody holds.</strong></p>
 
-Keep your login where it is: Cognito, Better Auth, Keycloak, Auth.js, whatever you already run.
-minidauth sits beside it and adds encryption whose key never exists in one place, plus a quorum that
-decides who may decrypt.
+<p align="center">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-111.svg"></a>
+  <img alt="Java 17+" src="https://img.shields.io/badge/java-17%2B-111.svg">
+  <img alt="107 tests passing" src="https://img.shields.io/badge/tests-107%20passing-111.svg">
+</p>
 
-Built on the [Tide protocol](https://tide.org), and distilled from
-[TideCloak](https://github.com/tide-foundation/tidecloak), which does all of this inside a Keycloak
-fork. minidauth lifts the key lifecycle and governance out of TideCloak so any auth system can use
-them.
-
-> **Status.** Identity, tokens, quorum governance and encryption all work against the public Tide
-> network. A value has been encrypted under a deployed policy and decrypted back through one gated on
-> a role. What is not yet enforced by the network is *who may approve a role grant*: today that is
-> this service's own operator quorum rather than a policy the ORKs check. See "governance".
->
-> The order you do things in matters more than anything else here, and getting it wrong strands the
-> key permanently. Follow the quick start in order and read "things that will bite you".
-
-## Why
-
-Your app can already tell who someone is. What it cannot do is stop itself reading their data: the
+Your app can already tell who someone is. What it cannot do is stop itself reading their data. The
 database holds the rows, the app holds the key, and taking the machine takes both.
 
-minidauth moves the key out. It exists only as shares spread across the Tide network, no single node
-can reconstruct it, and decryption is authorised by a policy the network enforces.
-
-The same key **signs** as well as encrypts, and signing is the busier half. Every sign-in token,
-every policy, every role grant and every settings change is an EdDSA signature produced jointly by a
-threshold of nodes. Nothing minidauth issues is signed locally, which is why a compromised host
-cannot forge a role or mint a token that the network will accept.
+minidauth moves the key out. It exists only as shares spread across the [Tide](https://tide.org)
+network, no single node can reconstruct it, and every decryption is authorised by a policy the
+network enforces. Your login stays exactly where it is: Cognito, Better Auth, Keycloak, Auth.js,
+whatever you already run.
 
 > **A stolen copy of your database contains nothing readable, and no key to make it readable.**
 
-That claim is deliberately narrow. Whoever runs minidauth holds the vendor key and can ultimately
-authorise reads, and a quorum of your own operators can grant themselves the reading role. Both are
-on purpose, because access has to be recoverable. What goes away is any *single* party doing it
-alone, especially your application.
+The same key signs as well as encrypts, and signing is the busier half. Every sign-in token, every
+policy, every role grant is an EdDSA signature produced jointly by a threshold of nodes. Nothing is
+signed locally, which is why owning the server does not let you forge a role or mint a token the
+network will accept.
+
+```sh
+cp MidgardJava-1.0-SNAPSHOT.jar vendor/
+MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up
+```
+
+That is the install. Details in [quick start](#quick-start).
+
+## What you actually get
+
+| | |
+|---|---|
+| **A key that is never assembled** | Not "stored in an HSM", not "held by a service". It exists as shares, and a threshold of independent nodes cooperate to use it. There is no moment where the whole key exists. |
+| **Reads decided by policy, not by your code** | The ORKs check the caller's role against a signed policy before they will help decrypt. Your app cannot decide to read; it can only ask. |
+| **Role grants that need more than one person** | A grant is filed, approved by administrators in their own enclaves, and only then does the network sign the attestations that make it real. |
+| **Your auth system untouched** | Store one extra column, a `vuid`, and add one callback route. |
+
+## Honestly, what is proven
+
+Everything above runs against the public Tide network, not a simulator:
+
+- A value encrypted under a deployed policy and decrypted back through one gated on a role.
+- A role grant refused by the network until an administrator approved it in their enclave.
+- Sign-in, token minting with attested roles, key rotation and licensing.
+
+What is not: policy *deployment* is still gated by this service rather than the network, for a
+reason explained under [governance](#what-the-network-enforces-and-what-this-service-does). And
+there are no Cognito or Better Auth sample apps yet, so the per-system notes below are written from
+the API surface.
+
+The order you do things in matters more than anything else here, and getting it wrong strands the
+key permanently. Follow the quick start in order and read "things that will bite you".
+
+## How this differs from what you have
+
+**A KMS or a vault** holds a key on your behalf and hands it over when your app asks. Compromise the
+app and you get the plaintext, because the app is allowed to ask. minidauth's key is never handed
+over, and the decision is made by nodes that are not yours.
+
+**Client-side end to end encryption** gets the key away from the server but makes recovery and
+sharing your problem. minidauth keeps recovery possible through a quorum, without any single party
+being able to read alone.
+
+**Envelope encryption in your app** still ends with a data key in the process that holds the data.
+
+## Why it exists
+
+Built on the [Tide protocol](https://tide.org) and distilled from
+[TideCloak](https://github.com/tide-foundation/tidecloak), which does all of this inside a Keycloak
+fork. If you are happy to run that fork, run it. minidauth lifts the key lifecycle and the
+governance out, so an existing auth system can have the same property without being replaced.
+
+That claim at the top is deliberately narrow. Whoever runs minidauth holds the vendor key and can
+ultimately authorise reads, and a quorum of your own operators can grant themselves the reading
+role. Both are on purpose, because access has to be recoverable. What goes away is any *single*
+party doing it alone, especially your application.
 
 ## Quick start
 
@@ -227,24 +272,37 @@ Operators sign in at `/console` with Tide. Nothing long-lived is stored anywhere
 
 ### What the network enforces, and what this service does
 
-Worth separating, because the console does not yet make the difference obvious.
+Worth separating, because "approved" can mean two very different things.
 
 | | decided by |
 |---|---|
-| who may decrypt | the ORKs, from the role in your doken, against the deployed decrypt policy |
+| who may decrypt | the ORKs, from the role in your doken, against the decrypt policy |
 | which units may be signed at all | the ORKs, from the bootstrap contract |
-| whether a role grant has enough approvals | **this service** |
+| whether a role grant has enough approvals | the ORKs, from administrator dokens |
 | whether a policy deployment has enough approvals | **this service** |
 
-The first two are cryptographic: a compromised host cannot decrypt without a role, and cannot sign
-the units that would grant itself one. The last two are not. They are checked here, by this process,
-against the approval threshold, so someone who owns the machine can approve their own change.
+The console shows the two tallies in separate columns for this reason. "Operators" is counted here
+and gates nothing against someone who owns the machine. "Admins" is counted by the network, from
+dokens signed inside each administrator's own enclave.
 
-Closing that means an EXPLICIT policy over `AttestationUnit:1` whose contract counts admin dokens,
-with role units routed to it, and the same for `Policy:1`. The bootstrap policy is IMPLICIT precisely
-because it cannot be: attestation units are signed on every sign-in, and a policy demanding approvals
-for those means no token can ever be minted, including the admin tokens it is waiting for. Breaking
-that circle is the remaining work.
+Role grants get there through two policies over the same model, which is what makes the split hold
+rather than depend on this service choosing honestly:
+
+| | |
+|---|---|
+| bootstrap, IMPLICIT | signs the units every sign-in needs, refuses the two that confer a role |
+| role-grants, EXPLICIT | signs *only* those two, and only with enough distinct administrators |
+
+Name the wrong one and it fails in the contract. The bootstrap has to be IMPLICIT because
+attestation units are signed on every sign-in, and demanding approvals there would mean no token
+could ever be minted, including the administrators' own.
+
+**Policy deployment is the one still on the wrong side of that line, and it cannot be moved on an
+existing key.** The bootstrap must also cover `Policy:1` or nothing further could be deployed, and a
+policy can only be rotated in place, never narrowed: the ORK's revoke-on-sign requires the
+replacement to carry the same contract and the same models. So this service can always name the
+IMPLICIT policy when deploying. Fixing it means teaching the bootstrap contract to refuse policies
+that are not EXPLICIT, which has to be designed into the first policy of a fresh key.
 
 ## Things that will bite you
 
