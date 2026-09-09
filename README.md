@@ -106,6 +106,51 @@ reason explained under [governance](#what-the-network-enforces-and-what-this-ser
 The order you do things in matters more than anything else here, and getting it wrong strands the
 key permanently. Follow the quick start in order and read "things that will bite you".
 
+## Who this is for
+
+Not everybody. It earns its keep when **the data your app stores would be bad news in someone
+else's hands, and you cannot honestly say your server is the last line of defence.**
+
+**A small team holding data far heavier than the team.** Health records, legal files, financial
+detail, anything under a regulator's eye. You do not have a security team, and you know one stolen
+laptop or one leaked backup ends the conversation. This puts the reading decision somewhere your
+laptop is not.
+
+**A SaaS where insiders should not be able to browse customers.** Support needs to help; support
+does not need to read. Today the difference is a code review and good intentions. Here it is a role
+a quorum granted, and the network refuses without it.
+
+**Anything with an admin panel that can read everything.** The most common breach is not a clever
+exploit, it is a session token belonging to somebody with too much access. Take that session here and
+you still cannot decrypt, because the token is not what the ORKs are checking.
+
+**A side project you would rather not be liable for.** The cheapest way to never leak user data is
+to be unable to read it.
+
+**Not for you if** the data is public anyway, if you need to run analytics over plaintext server
+side, or if you cannot tolerate a network hop on reads. Those are real costs and no amount of
+cryptography talks you out of them.
+
+## Questions you are about to ask
+
+**Does it slow everything down?** Reads that need decryption make a network call to a threshold of
+nodes. Sign-in does too. Ordinary requests that touch no protected data are untouched. If every page
+load decrypts something, you will feel it; if a handful of screens do, you will not.
+
+**What if Tide disappears?** Offboarding exists for exactly this, and it is the one path where keys
+are made whole again, deliberately. It is a property of the protocol rather than something minidauth
+implements today, and worth reading about before you commit anything you cannot re-encrypt.
+
+**What does it cost?** The vendor key needs a Tide licence, which is a subscription arranged with the
+Tide Foundation. minidauth itself is MIT and free.
+
+**Is it production ready?** No, and the [status section](#honestly-what-is-proven) says exactly what
+has been run against the public network and what has not. Treat it as something to try rather than
+something to depend on.
+
+**Do I have to replace my login?** No, that is the entire point. Five [examples](examples) show the
+same integration against different providers, and it is one column and one route in each.
+
 ## How this differs from what you have
 
 **A KMS or a vault** holds a key on your behalf and hands it over when your app asks. Compromise the
@@ -409,11 +454,12 @@ again does not reset your users, and reusing a username returns 409.
 **Owning the host still means holding the vendor key.** Signed grants stop silent forgery of roles;
 they do not stop someone with the machine acting within deployed policies.
 
-**Signing your own payloads goes through tide-js, and needs a policy.** A custom request routed
-through a policy hands your bytes to the contract before the network signs, so a policy can refuse a
-payload it does not recognise. tide-js can build that request today; minidauth cannot, because the
-Java bindings cannot set a request name or draft. Either way it needs a deployed policy, so the
-pack constraint above applies.
+**Signing your own payloads happens in the browser, not here.** A custom request routed through a
+policy hands your bytes to the contract before the network signs, so a policy can refuse a payload it
+does not recognise. The client libraries build that request and send it to the enclave, the same way
+they do encryption; `heimdall-tide` is on npm and needs no vendoring. What minidauth cannot do is
+build one server side, because the Java bindings cannot set a request name or draft. Either way it
+needs a deployed policy, so the pack constraint above applies.
 
 Do not reach for the local signing call in the Java bindings. It takes a fully reconstructed private
 key and exists only for realms that have left Tide, so using it would put a whole key in this
