@@ -70,7 +70,7 @@ app.get("/tide/link", async (req, res) => {
   const s = current(req);
   if (!s) return res.redirect("/");
   const sessionId = "app-" + crypto.randomUUID();
-  pending.set(sessionId, { sid: req.cookies.sid, at: Date.now() });
+  pending.set(s.sub, { sessionId, at: Date.now() });
   try {
     res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
   } catch (e) {
@@ -79,15 +79,17 @@ app.get("/tide/link", async (req, res) => {
 });
 
 app.get("/tide/callback", async (req, res) => {
-  const { data, sid } = req.query;
-  const started = pending.get(String(sid));
-  pending.delete(String(sid));
-  if (!data || !started || started.sid !== req.cookies.sid) {
+  // The enclave calls it vendorEncryptedData, and sends back no session id of its own.
+  const data = req.query.vendorEncryptedData;
+  const s = current(req);
+  const started = s ? pending.get(s.sub) : null;
+  if (s) pending.delete(s.sub);
+
+  if (!data || !started) {
     return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
   }
   try {
-    const { vuid } = await completeLogin(String(data), String(sid));
-    const s = current(req);
+    const { vuid } = await completeLogin(String(data), started.sessionId);
     s.vuid = vuid;
     await auth0.storeVuid(s.sub, vuid);
     res.redirect("/");

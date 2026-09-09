@@ -3,6 +3,37 @@
 Supabase owns the login. minidauth supplies an identity the Tide network vouches for and roles a
 quorum decides. Free tier, no card.
 
+## What it looks like
+
+Recorded against a real Supabase project and the public Tide network, in that order.
+
+**1. Signed in with Supabase, no Tide identity yet.** Authentication has already happened. There is
+nothing to authorise against.
+
+![Signed in, not linked](docs/1-unlinked.png)
+
+**2. Linking goes to the Tide enclave.** Not to this app and not to minidauth. The password is typed
+into a page served by the ORK network, and neither this app nor minidauth ever sees it.
+
+![The Tide enclave](docs/2-enclave.png)
+
+**3. Linked.** minidauth verified the blind signature before answering, so the vuid is proven rather
+than claimed. The example says plainly that the existing token predates the link, instead of
+pretending it refreshed.
+
+![Linked](docs/3-linked.png)
+
+**4. Signed in again, now carrying roles.** The roles are not in the Supabase token. They were read
+from the grant record, which only a quorum can change.
+
+![Granted roles](docs/4-granted.png)
+
+**5. The protected page.** Allowed, because the grant record says so.
+
+![Allowed](docs/5-allowed.png)
+
+Without `vault-reader` the same page refuses, and no row you can edit in Supabase changes that.
+
 ## Run it
 
 Create a project at [supabase.com](https://supabase.com), then take three values from
@@ -51,5 +82,5 @@ pretending it refreshed.
 
 ## Status
 
-Written from the Supabase API. The minidauth half is shared with
-[the Better Auth example](../better-auth), which is exercised against the live network.
+Run end to end against a real Supabase project and the public Tide network: sign in, link, and a
+protected page that reads its answer from the grant record. The screenshots above are that run.

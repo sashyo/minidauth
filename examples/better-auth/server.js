@@ -78,7 +78,7 @@ app.get("/tide/link", async (req, res) => {
   if (!s) return res.redirect("/");
 
   const sessionId = "app-" + crypto.randomUUID();
-  pending.set(sessionId, { userId: s.user.id, at: Date.now() });
+  pending.set(s.user.id, { sessionId, at: Date.now() });
   try {
     res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
   } catch (e) {
@@ -92,15 +92,18 @@ app.get("/tide/link", async (req, res) => {
  * still has to get right is that the reply belongs to the sign-in it started, for the account that
  * started it, which is what the pending map is for. */
 app.get("/tide/callback", async (req, res) => {
-  const { data, sid } = req.query;
-  const started = pending.get(sid);
-  pending.delete(sid);
+  // The enclave calls it vendorEncryptedData, and sends back no session id of its own.
+  const data = req.query.vendorEncryptedData;
+  const s = await session(req);
+  const started = s ? pending.get(s.user.id) : null;
+  if (s) pending.delete(s.user.id);
+
   if (!data || !started) {
     return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
   }
 
   try {
-    const { vuid } = await completeLogin(String(data), String(sid));
+    const { vuid } = await completeLogin(String(data), started.sessionId);
     await auth.api.updateUser({
       body: { tideVuid: vuid },
       headers: fromNodeHeaders(req.headers),

@@ -12,7 +12,11 @@ const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`;
 app.use(cookieParser());
 app.use(express.json());
 
-/* Which signed-in user started a Tide link, so the reply can only attach to them. */
+/* Tide sign-ins in flight, keyed by the user who started one.
+ *
+ * The enclave returns with its payload but not with the session id, so this side has to remember
+ * which sign-in it started. Keying by the signed-in user is also what stops one account's reply
+ * being applied to another. */
 const pending = new Map();
 
 /* Supabase signs in from the browser, so the access token arrives in a cookie this app sets from
@@ -70,7 +74,7 @@ app.get("/tide/link", async (req, res) => {
   if (!user) return res.redirect("/");
 
   const sessionId = "app-" + crypto.randomUUID();
-  pending.set(sessionId, { userId: user.id, at: Date.now() });
+  pending.set(user.id, { sessionId, at: Date.now() });
   try {
     res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
   } catch (e) {
@@ -79,15 +83,17 @@ app.get("/tide/link", async (req, res) => {
 });
 
 app.get("/tide/callback", async (req, res) => {
-  const { data, sid } = req.query;
-  const started = pending.get(String(sid));
-  pending.delete(String(sid));
+  // The enclave calls it vendorEncryptedData, and sends no session id of its own.
+  const data = req.query.vendorEncryptedData;
   const user = await userOf(req);
-  if (!data || !started || !user || started.userId !== user.id) {
+  const started = user ? pending.get(user.id) : null;
+  if (user) pending.delete(user.id);
+
+  if (!data || !started) {
     return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
   }
   try {
-    const { vuid } = await completeLogin(String(data), String(sid));
+    const { vuid } = await completeLogin(String(data), started.sessionId);
     await supabase.storeVuid(user.id, vuid);
     // The access token in the cookie predates the change, so it is refreshed on the next sign-in.
     res.send(page(`<h1>Linked</h1>
