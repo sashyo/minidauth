@@ -5,9 +5,14 @@
  * send the browser somewhere to prove a Tide identity, turn the reply into a proven vuid, and read
  * what that identity has been granted.
  *
- * The token this uses holds the `relying-party` role, which grants nothing on its own. It can start
- * a sign-in, finish one, and read grants. It cannot approve a change or touch the vendor key, so
- * leaking it hands nobody a role.
+ * The token this uses holds the `relying-party` role, which grants nothing on its own. It is not what
+ * makes the roles trustworthy, since those come from a grant record the network attested. It is
+ * there because starting a sign-in spends licence quota and because the grant record should not be
+ * readable by anyone who can reach the port. Leaking it costs quota and a look at who holds what; it
+ * hands nobody a role.
+ *
+ * It authenticates this app to minidauth, not minidauth to this app, so anywhere but localhost the
+ * connection between the two wants TLS like any other trusted call.
  */
 const BASE = () => process.env.MINIDAUTH_URL ?? "http://localhost:8081";
 const TOKEN = () => process.env.MINIDAUTH_TOKEN ?? "dev-sample-app-token";

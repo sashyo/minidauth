@@ -30,6 +30,27 @@ with a short-lived map and refuses anything else with a 400.
 **3. Read authorisation, do not store it.** `rolesFor(vuid)` on every request. This is the step that
 matters: it is what makes a role something your database cannot decide.
 
+## Why the app needs a minidauth token
+
+It is a fair thing to ask, because it is not what makes the roles trustworthy. Those come from a
+grant record the network attested, and the token adds nothing to that.
+
+What it does buy is two things.
+
+**Cost.** Starting a sign-in registers a voucher session, and issuing a voucher spends the vendor key
+and draws on the licence's account quota. An open endpoint is an open tap.
+
+**Not publishing your governance.** `/iga/grants/{vuid}` is the answer to who may read what. There is
+no reason for that to be readable by anyone who can reach the port.
+
+What it is not: proof that the answer came from minidauth. The token authenticates your app *to*
+minidauth, not the other way round, so on anything but localhost the connection between them wants
+TLS like any other trusted call.
+
+Leaking it grants nobody a role. `relying-party` carries no privileges: no route requires it, so it
+cannot approve a change, deploy a policy or touch the key. The worst it costs you is quota and a
+look at the grant record.
+
 ## The mistake all four are written to avoid
 
 Every one of these systems will happily put custom claims in a token. Cognito has Pre Token
