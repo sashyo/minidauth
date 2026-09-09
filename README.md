@@ -83,11 +83,13 @@ Everything above runs against the public Tide network, not a simulator:
 - A value encrypted under a deployed policy and decrypted back through one gated on a role.
 - A role grant refused by the network until an administrator approved it in their enclave.
 - Sign-in, token minting with attested roles, key rotation and licensing.
+- A [Better Auth app](examples/better-auth) linking its users to Tide identities and reading
+  authorisation from the quorum.
 
 What is not: policy *deployment* is still gated by this service rather than the network, for a
 reason explained under [governance](#what-the-network-enforces-and-what-this-service-does). And
-there are no Cognito or Better Auth sample apps yet, so the per-system notes below are written from
-the API surface.
+there is no Cognito sample app, so those notes are written from the API surface. Better Auth has a
+runnable one in [examples/better-auth](examples/better-auth).
 
 The order you do things in matters more than anything else here, and getting it wrong strands the
 key permanently. Follow the quick start in order and read "things that will bite you".
@@ -250,9 +252,10 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-> **Status:** the endpoints below are exercised against a live Tide network. The per-system notes
-> that follow are written from that API surface, not from shipped integrations: there is no Cognito
-> or Better Auth sample app yet. Treat them as the intended shape, not as a tested recipe.
+There is a runnable example: [examples/better-auth](examples/better-auth). It keeps Better Auth's
+accounts and passwords untouched, links a Tide identity to a user, and reads authorisation from the
+grant record on every request rather than from its own database. The Cognito notes below are written
+from the same API surface but have no sample app behind them yet.
 
 | | |
 |---|---|

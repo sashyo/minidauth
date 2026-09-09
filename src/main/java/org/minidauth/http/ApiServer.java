@@ -329,13 +329,23 @@ public final class ApiServer implements AutoCloseable {
         router.post("/tide/enclave/login-url", (ex, p) -> {
             authenticate(ex);
             Map<String, Object> body = Json.readBody(ex);
+            String sessionId = Json.requireString(body, "sessionId");
+
+            /* Serve our own vouchers unless the caller names an issuer.
+             *
+             * An integrating app has no business knowing where vouchers come from, and requiring it
+             * to pass one meant every integration started with a 400 and a puzzle. Registering the
+             * session here is what lets the voucher endpoint recognise the enclave when it calls. */
             String voucherUrl = Json.string(body, "voucherUrl");
-            if (voucherUrl == null) voucherUrl = config.voucherUrl;
-            if (voucherUrl == null) {
-                throw new Json.HttpError(400, "voucherUrl is required (or set MC_VOUCHER_URL)");
+            if (voucherUrl == null || voucherUrl.isBlank()) voucherUrl = config.voucherUrl;
+            if (voucherUrl == null || voucherUrl.isBlank()) {
+                rememberSignInSession(sessionId);
+                voucherUrl = voucherBase() + "/tide/vouchers?session="
+                        + java.net.URLEncoder.encode(sessionId, java.nio.charset.StandardCharsets.UTF_8);
             }
+
             java.net.URI url = tideAuth.loginUrl(
-                    Json.requireString(body, "sessionId"),
+                    sessionId,
                     Json.requireString(body, "redirectUri"),
                     voucherUrl,
                     Json.string(body, "extraQuery"),

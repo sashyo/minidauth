@@ -2,5 +2,7 @@
   { "name": "ops",   "token": "change-me-ops",   "roles": ["vrk-admin"] },
   { "name": "alice", "token": "change-me-alice", "roles": ["approver"] },
   { "name": "bob",   "token": "change-me-bob",   "roles": ["approver"] },
-  { "name": "carol", "token": "change-me-carol", "roles": ["approver"] }
+  { "name": "carol", "token": "change-me-carol", "roles": ["approver"] },
+
+  { "name": "your-app", "token": "change-me-app", "roles": ["relying-party"] }
 ]

@@ -1,0 +1,11 @@
+{
+  "name": "minidauth-better-auth-example",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "better-auth": "^1.7.3",
+    "better-sqlite3": "^12.0.0",
+    "express": "^4.21.2"
+  }
+}
