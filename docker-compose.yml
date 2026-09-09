@@ -10,8 +10,14 @@
 
 services:
   minidauth:
+    # Published images are not available yet: the image contains Tide's MidgardJava, which carries
+    # no licence, so it cannot be redistributed without their permission. Until then this builds
+    # locally from the jar you supply in vendor/.
+    #
+    #   image: ghcr.io/sashyo/minidauth:latest
     build:
       context: .
+    platform: linux/amd64
     ports:
       - "8081:8081"
     environment:

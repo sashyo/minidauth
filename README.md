@@ -79,8 +79,15 @@ endpoint answers on it; the console, the ops routes and the governance API retur
 on the host the request arrived on. Drop the profile if this service already has a public URL, and
 set `MC_VOUCHER_PUBLIC_URL` to it instead.
 
-**MidgardJava** is a Tide library, not on Maven Central and not redistributed here, so put the jar in
-`vendor/` before building. The native library rides inside it, so nothing else is needed.
+**You need the MidgardJava jar, and it is not public.** Its source lives in a private Tide
+repository, it is not on Maven Central, and the jar itself carries no licence, so this project cannot
+redistribute it or ship it inside an image. Ask the [Tide Foundation](https://tide.org) for it and
+put it in `vendor/`. The native library rides inside the jar, and it is built for `linux-x86-64`
+only, so Docker is the sane route on anything else.
+
+That is a real barrier and it is nobody's oversight but the reason to say so plainly: without that
+jar the build does not compile, which is also why this repository has no CI.
+[docs/running.md](docs/running.md#distributing-an-image) has what would need to change.
 
 Without Docker, and with a JDK 17+ and Maven:
 

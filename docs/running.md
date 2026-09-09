@@ -220,3 +220,31 @@ process and give up the one property that matters.
 Rotating the VRK does not touch stored data, because data is encrypted to the VVK. The two are easy
 to confuse and the difference is expensive.
 
+
+## Distributing an image
+
+The quickest way to let somebody try minidauth is a published image: no Java, no Maven, no hunting
+for a jar. `docker/publish.sh` builds and tags one. **Do not push it yet.**
+
+The image contains `MidgardJava`, and that jar:
+
+| | |
+|---|---|
+| carries no licence | no LICENSE, no NOTICE, nothing in the manifest, so all rights reserved |
+| has no public source | `tide-foundation/Midgard` is a private repository |
+| is not on Maven Central | there is no coordinate to depend on |
+| contains only `linux-x86-64` | no macOS, no Windows, no arm64 |
+
+Pushing that image to a registry redistributes Tide's code as surely as committing the jar would.
+Ask them first. The ask is narrow, and worth separating into three:
+
+1. **May we ship the jar inside a container image?** The smallest yes, and it unblocks every user.
+2. **Could the jar carry a licence?** Right now its terms cannot be known by anybody who receives it.
+3. **Could it go to Maven Central?** Then the dependency stops being a topic at all.
+
+The contrast is worth putting in front of them: `tide-js` is a public repository under the Tide
+Community Open Code License, and `@tideorg/js` and `heimdall-tide` are on npm. The browser half of
+Tide is open and installable. The Java half is not, and this service is Java.
+
+The same dependency is why there is no CI here. The code imports `org.midgard`, so a build without
+the jar does not compile, and a public runner has no way to get it.
