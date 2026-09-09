@@ -42,6 +42,20 @@ server stores what it is given and cannot read any of it.</p>
   <h2>Stored notes</h2>
   <div id="notes"></div>
 
+  <h2>Ask the network to sign a payment</h2>
+  <div class="card">
+    <p class="muted">Signing is the other half, and it does something encryption cannot. A custom
+      request always has its data checked by the policy's contract <em>before</em> the cohort will
+      sign, so the network can refuse a payload outright. This policy signs payments up to
+      <strong id="limit">its limit</strong> and declines anything above.</p>
+    <p class="row">
+      <input id="amount" style="width:120px" value="250"> to
+      <input id="payee" style="width:160px" value="alice">
+      <button id="sign">Ask for a signature</button>
+    </p>
+    <pre id="signOut">nothing signed yet</pre>
+  </div>
+
   <h2>What the database actually contains</h2>
   <p class="muted">The file this server writes, verbatim. This is what a stolen copy looks like.</p>
   <pre id="raw">loading…</pre>
@@ -205,10 +219,60 @@ $("save") && ($("save").onclick = async () => {
   } finally { btn.disabled = false; }
 });
 
+/* Signing a payload of your own.
+ *
+ * The request is built here, given the policy, and handed to the enclave. Two round trips: the
+ * network first signs the request's own creation, which is what lets a policy authorise it at all,
+ * and then signs the payload itself. */
+async function signPayment(text) {
+  const { Models, Tools } = await import("https://esm.sh/@tideorg/js@0.14.25");
+  const { BaseTideRequest } = Models;
+  const { TideMemory } = Tools;
+
+  const [name, version] = enclaveCfg.paymentModel.split(":");
+  const draft = TideMemory.CreateFromArray([new TextEncoder().encode(text)]);
+  const request = new BaseTideRequest(name, version, "Policy:1", draft, new TideMemory());
+  request.addPolicy(b64ToBytes(enclaveCfg.paymentPolicy));
+
+  await openEnclave();
+
+  // The creation of this request is itself signed, under the same policy.
+  const details = await request.getRequestInitDetails();
+  const init = new BaseTideRequest("TideRequestInitialization", "1", "Doken:1",
+    TideMemory.CreateFromArray([details.creationTime, details.expireTime, details.modelId,
+      details.draftHash]),
+    new TideMemory());
+  init.addPolicy(b64ToBytes(enclaveCfg.paymentPolicy));
+
+  const creationSig = (await enclave.ask(
+    { flow: "sign", request: init.encode(), waitForAll: false }, "sign request completed"))[0];
+  request.addCreationSignature(details.creationTime, creationSig);
+
+  const signatures = await enclave.ask(
+    { flow: "sign", request: request.encode(), waitForAll: false }, "sign request completed");
+  return bytesToB64(signatures[0]);
+}
+
+$("sign") && ($("sign").onclick = async () => {
+  const btn = $("sign"); btn.disabled = true;
+  const out = $("signOut");
+  const payload = `amount=${$("amount").value};to=${$("payee").value}`;
+  out.className = "";
+  out.textContent = "asking the network to sign:\n  " + payload + "\n";
+  try {
+    const sig = await signPayment(payload);
+    out.textContent += "\nsigned by the cohort:\n  " + sig;
+  } catch (e) {
+    out.textContent += "\nthe network refused:\n  " + e.message
+      + "\n\nNo signature means no instruction. This app cannot proceed without one.";
+  } finally { btn.disabled = false; }
+});
+
 me = await api("/api/me");
 renderWho();
 if (me.signedIn) {
   enclaveCfg = await api("/api/enclave");
+  if (enclaveCfg.paymentLimit != null) $("limit").textContent = enclaveCfg.paymentLimit;
   await renderNotes();
 }
 </script>

@@ -53,8 +53,14 @@ That is the install. Details in [quick start](#quick-start).
 | **Your auth system untouched** | Store one extra column, a `vuid`, and add one callback route. |
 
 Encryption is the visible one, and the easiest to check, which is why the demo leads with it. It is
-not the whole of what the key does: signing is the busier half, and it is what makes a role grant or
-a policy something your own server cannot fake.
+not the whole of what the key does.
+
+**Signing is the half that decides what may happen at all.** A custom request has its payload read by
+the policy's contract before the cohort will sign, so the network can decline. The
+[demo](examples/notes#signing-which-encryption-cannot-do) signs `amount=250;to=alice` and refuses
+`amount=5000;to=alice`, with fourteen nodes independently answering "over the limit this policy will
+sign". That refusal happens where your code does not run, so owning your server does not produce the
+signature anyway. Approving a release, authorising a refund, issuing a credential: same shape.
 
 ## The easy way into Tide
 
@@ -95,6 +101,8 @@ Everything above runs against the public Tide network, not a simulator:
 - A value encrypted under a deployed policy and decrypted back through one gated on a role.
 - A role grant refused by the network until an administrator approved it in their enclave.
 - Sign-in, token minting with attested roles, key rotation and licensing.
+- A payment instruction signed by the cohort, and one over the policy's limit refused by fourteen
+  nodes independently.
 - [Supabase](examples/supabase) and [Clerk](examples/clerk) apps linking their users to Tide
   identities and reading authorisation from the quorum, both recorded step by step. Better Auth the
   same, locally. Auth0 and Cognito share their minidauth code but have not been run against real

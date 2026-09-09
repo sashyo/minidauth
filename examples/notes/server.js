@@ -107,6 +107,14 @@ app.get("/api/enclave", async (req, res) => {
     ]);
     const decrypt = await get("/vault/decrypt-policy").catch(() => null);
 
+    /* The signing policy, found by the model it governs rather than by its name.
+     *
+     * A custom request always has its data validated before the cohort signs, so this policy's
+     * contract sees the payment before deciding. That is the part encryption cannot do. */
+    const policies = await get("/iga/policies").catch(() => []);
+    const list = Array.isArray(policies) ? policies : Object.values(policies ?? {});
+    const payment = list.find((x) => (x.modelIds ?? []).some((m) => m.startsWith("BasicCustom<")));
+
     res.json({
       homeOrkUrl: cfg.homeOrkUrl,
       vvkId: cfg.vvkId,
@@ -114,6 +122,9 @@ app.get("/api/enclave", async (req, res) => {
       voucherUrl: voucher.voucherUrl,
       encryptPolicy: encrypt.policy,
       decryptPolicy: decrypt?.policy ?? null,
+      paymentPolicy: payment?.policyBytes ?? null,
+      paymentModel: payment?.modelIds?.[0] ?? null,
+      paymentLimit: payment?.params?.limit ?? null,
     });
   } catch (e) {
     res.status(502).json({ error: e.message });

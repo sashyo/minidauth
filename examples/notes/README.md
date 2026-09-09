@@ -19,6 +19,31 @@ Behind all of it, and invisible in any screenshot: every token, policy and role 
 jointly by a threshold of independent nodes. Nothing was signed on this machine, which is why owning
 this machine does not let you forge a role or mint a token the network will accept.
 
+## Signing, which encryption cannot do
+
+The demo also asks the network to sign a payment instruction. This is the part that makes minidauth
+more than a way to encrypt things.
+
+A custom request always has its data validated before the cohort will sign it, so the policy's
+contract reads your payload first and can decline. Here the policy signs payments up to 1000:
+
+![Refused over the limit](docs/signing.png)
+
+`amount=250;to=alice` comes back signed. `amount=5000;to=alice` comes back with nothing:
+
+```
+0 of 14 required signatures
+Forseti policy denied (Data): Over the limit this policy will sign
+```
+
+Fourteen independent nodes each read the instruction and refused. Note what that is not: it is not
+your application checking a limit and choosing to behave. The refusal happens somewhere your code
+does not run, so an attacker who owns your server still cannot produce a signed instruction over the
+limit. Without the signature there is no instruction, only a string that failed to become one.
+
+The same shape covers approving a release, authorising a refund, issuing a credential: anything where
+the question is not "can this be read" but "should this be allowed to happen at all".
+
 > **A stolen copy of the database contains nothing readable, and no key to make it readable.**
 
 ## What each part is proving
