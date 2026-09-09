@@ -49,15 +49,23 @@ public final class Operators {
                 if (e.name == null || e.name.isBlank()) {
                     throw new IllegalStateException("Operator entry in " + file + " has no name");
                 }
-                if (e.token == null || e.token.isBlank()) {
-                    throw new IllegalStateException("Operator '" + e.name + "' in " + file + " has no token");
+                boolean hasToken = e.token != null && !e.token.isBlank();
+                boolean hasDigest = e.tokenDigest != null && !e.tokenDigest.isBlank();
+                if (!hasToken && !hasDigest) {
+                    throw new IllegalStateException("Operator '" + e.name + "' in " + file
+                            + " has neither token nor tokenDigest");
+                }
+                if (hasToken && hasDigest) {
+                    throw new IllegalStateException("Operator '" + e.name + "' in " + file
+                            + " has both token and tokenDigest; keep the digest and drop the token");
                 }
                 Set<Role> roles = EnumSet.noneOf(Role.class);
                 for (String r : e.roles) roles.add(Role.fromWire(r));
                 if (roles.isEmpty()) {
                     throw new IllegalStateException("Operator '" + e.name + "' in " + file + " has no roles");
                 }
-                operators.add(e.name, e.token, roles);
+                // A digest goes in as it stands; a token is reduced to one on the way past.
+                operators.addDigest(e.name, hasDigest ? e.tokenDigest.trim() : digest(e.token), roles);
             }
             log.info("Loaded operators from %s", file);
         }
@@ -70,7 +78,10 @@ public final class Operators {
     }
 
     private void add(String name, String token, Set<Role> roles) {
-        String digest = digest(token);
+        addDigest(name, digest(token), roles);
+    }
+
+    private void addDigest(String name, String digest, Set<Role> roles) {
         Operator existing = byTokenDigest.get(digest);
         if (existing != null && !existing.name().equals(name)) {
             throw new IllegalStateException("Operators '" + existing.name() + "' and '" + name
@@ -122,7 +133,20 @@ public final class Operators {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static final class Entry {
         public String name;
+        /** The token itself. Convenient for a dev machine, and a credential at rest. */
         public String token;
+        /**
+         * The token's SHA-256, base64, instead of the token.
+         *
+         * <p>Preferred. This service already keeps only digests in memory, but a file holding the
+         * tokens themselves is still a file worth stealing, which sits badly in a project whose
+         * whole claim is that reading the host does not hand you anything. With digests the file
+         * grants nothing: it can say who may approve, and not act as any of them.
+         *
+         * <p>Generate one with:
+         * <pre>printf %s "$TOKEN" | openssl dgst -sha256 -binary | base64</pre>
+         */
+        public String tokenDigest;
         public List<String> roles = List.of();
     }
 }

@@ -143,6 +143,15 @@ take Tide sign-ins and the token has no further use. Stop exporting it.
 For a real quorum before Tide admins exist, `cp operators.example.json operators.json` and list your
 operators instead; with a single admin token the approval threshold is 1.
 
+Put the token's digest in that file rather than the token, so the file is not itself worth stealing:
+
+```sh
+printf %s "$TOKEN" | openssl dgst -sha256 -binary | base64
+```
+
+A plain `token` still works for a dev machine. Both is refused, because it is never clear which one
+was meant to be authoritative.
+
 Defaults point at the public Tide network, so there is nothing else to configure:
 
 | | |
