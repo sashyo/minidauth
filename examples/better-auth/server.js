@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { auth } from "./auth.js";
-import { loginUrl, completeLogin, rolesFor } from "./minidauth.js";
+import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;

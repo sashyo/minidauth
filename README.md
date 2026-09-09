@@ -84,12 +84,11 @@ Everything above runs against the public Tide network, not a simulator:
 - A role grant refused by the network until an administrator approved it in their enclave.
 - Sign-in, token minting with attested roles, key rotation and licensing.
 - A [Better Auth app](examples/better-auth) linking its users to Tide identities and reading
-  authorisation from the quorum.
+  authorisation from the quorum. Cognito, Auth0 and Clerk share its minidauth code but have not been
+  run against real accounts.
 
 What is not: policy *deployment* is still gated by this service rather than the network, for a
-reason explained under [governance](#what-the-network-enforces-and-what-this-service-does). And the
-[Cognito example](examples/cognito) has not been run against a real user pool yet, though the
-minidauth half of it is the same code as the Better Auth one.
+reason explained under [governance](#what-the-network-enforces-and-what-this-service-does).
 
 The order you do things in matters more than anything else here, and getting it wrong strands the
 key permanently. Follow the quick start in order and read "things that will bite you".
@@ -252,13 +251,20 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-Two runnable examples, and both make the same point: authentication stays where it is, and
-authorisation comes from the grant record on every request rather than from the app's own database.
+Four of them, in [examples](examples), and the point of having several is that the minidauth half
+never changes. It is the same file in all four. Authentication stays where it is; authorisation comes
+from the grant record on every request rather than from the app's own database.
 
 | | |
 |---|---|
-| [examples/better-auth](examples/better-auth) | Runs locally, exercised against the live network |
-| [examples/cognito](examples/cognito) | Written from the API, not yet run against a real user pool |
+| [better-auth](examples/better-auth) | Runs locally, exercised against the live network |
+| [cognito](examples/cognito) | `npm run setup` creates the pool, client and domain |
+| [auth0](examples/auth0) | Written from the API |
+| [clerk](examples/clerk) | Written from the API |
+
+Each one is three steps: store the vuid where the user cannot edit it, add a callback route, and
+read roles rather than storing them. All four are written to avoid the same mistake, which is
+putting roles in a token your own system can mint.
 
 | | |
 |---|---|

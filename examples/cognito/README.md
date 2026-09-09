@@ -10,7 +10,7 @@ deployed.
 
 ```sh
 npm install
-AWS_REGION=eu-west-2 MINIDAUTH_OPS_TOKEN=<your ops token> npm run setup
+AWS_REGION=ap-southeast-2 MINIDAUTH_OPS_TOKEN=<your ops token> npm run setup
 npm start                                   # http://localhost:3001
 ```
 

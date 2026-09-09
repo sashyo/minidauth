@@ -1,0 +1,11 @@
+{
+  "name": "minidauth-auth0-example",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node --env-file-if-exists=.env server.js" },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jose": "^5.9.6"
+  }
+}
