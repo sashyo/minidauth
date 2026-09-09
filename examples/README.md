@@ -6,9 +6,10 @@ change: [`shared/minidauth.js`](shared/minidauth.js) is the same file in all of 
 | | | |
 |---|---|---|
 | [better-auth](better-auth) | :3000 | Runs locally, exercised against the live network |
-| [cognito](cognito) | :3001 | `npm run setup` creates everything, unrun against a real pool |
-| [auth0](auth0) | :3002 | Written from the API, unrun against a real tenant |
-| [clerk](clerk) | :3003 | Written from the API, unrun against a real application |
+| [supabase](supabase) | :3004 | Free tier, no card |
+| [clerk](clerk) | :3003 | Free tier, no card |
+| [auth0](auth0) | :3002 | Free tier, no card |
+| [cognito](cognito) | :3001 | `npm run setup` builds the pool, but AWS wants a card |
 
 ## The pattern, in three steps
 
@@ -18,9 +19,10 @@ already run, and the only rule is that the user must not be able to edit it:
 | | |
 |---|---|
 | Better Auth | a `tideVuid` column, `input: false` |
-| Cognito | `custom:tide_vuid` |
-| Auth0 | `app_metadata.tide_vuid` |
+| Supabase | `raw_app_meta_data.tide_vuid`, service role only |
 | Clerk | `privateMetadata.tideVuid` |
+| Auth0 | `app_metadata.tide_vuid` |
+| Cognito | `custom:tide_vuid` |
 
 **2. Add one callback route.** Send the browser to `loginUrl(...)`, and when the enclave returns,
 `completeLogin(...)` gives you a vuid minidauth has already verified. Your app still has to check
@@ -69,9 +71,9 @@ either, because a public key cannot be presented as a credential.
 
 ## The mistake all four are written to avoid
 
-Every one of these systems will happily put custom claims in a token. Cognito has Pre Token
-Generation triggers, Auth0 has Actions, Clerk has session token metadata, Better Auth has additional
-fields.
+Every one of these systems will happily put custom claims in a token. Auth0 has Actions, Clerk has
+session token metadata, Supabase puts `app_metadata` straight into the JWT, Better Auth has
+additional fields, Cognito has Pre Token Generation triggers.
 
 Do not put roles there. **A role that arrives in a token your own system can mint is a role your own
 system can grant itself**, and you are back to a single point of failure. The token carries identity;

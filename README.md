@@ -84,8 +84,8 @@ Everything above runs against the public Tide network, not a simulator:
 - A role grant refused by the network until an administrator approved it in their enclave.
 - Sign-in, token minting with attested roles, key rotation and licensing.
 - A [Better Auth app](examples/better-auth) linking its users to Tide identities and reading
-  authorisation from the quorum. Cognito, Auth0 and Clerk share its minidauth code but have not been
-  run against real accounts.
+  authorisation from the quorum. Supabase, Clerk, Auth0 and Cognito share its minidauth code but
+  have not been run against real accounts.
 
 What is not: policy *deployment* is still gated by this service rather than the network, for a
 reason explained under [governance](#what-the-network-enforces-and-what-this-service-does).
@@ -273,16 +273,17 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-Four of them, in [examples](examples), and the point of having several is that the minidauth half
+Five of them, in [examples](examples), and the point of having several is that the minidauth half
 never changes. It is the same file in all four. Authentication stays where it is; authorisation comes
 from the grant record on every request rather than from the app's own database.
 
 | | |
 |---|---|
 | [better-auth](examples/better-auth) | Runs locally, exercised against the live network |
-| [cognito](examples/cognito) | `npm run setup` creates the pool, client and domain |
-| [auth0](examples/auth0) | Written from the API |
-| [clerk](examples/clerk) | Written from the API |
+| [supabase](examples/supabase) | Free tier, no card |
+| [clerk](examples/clerk) | Free tier, no card |
+| [auth0](examples/auth0) | Free tier, no card |
+| [cognito](examples/cognito) | `npm run setup` builds the pool, but AWS wants a card |
 
 Each one is three steps: store the vuid where the user cannot edit it, add a callback route, and
 read roles rather than storing them. All four are written to avoid the same mistake, which is
