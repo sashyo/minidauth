@@ -51,6 +51,22 @@ Leaking it grants nobody a role. `relying-party` carries no privileges: no route
 cannot approve a change, deploy a policy or touch the key. The worst it costs you is quota and a
 look at the grant record.
 
+### Better: do not share a secret at all
+
+A shared secret has to exist at both ends, so minidauth's operators file is a copy of every app's
+credential. Give it a public key instead:
+
+```sh
+node ../shared/keygen.js your-app     # public key for operators.json, private key for the app
+export MINIDAUTH_CLIENT_NAME=your-app
+export MINIDAUTH_CLIENT_KEY=<the private key it printed>
+```
+
+The shared client picks that up on its own and signs a fresh assertion per call instead of sending
+`MINIDAUTH_TOKEN`. Each one names this service, lives for a minute, and is accepted once, so an
+assertion observed in transit is worth nothing. A copy of minidauth's operators file is worth nothing
+either, because a public key cannot be presented as a credential.
+
 ## The mistake all four are written to avoid
 
 Every one of these systems will happily put custom claims in a token. Cognito has Pre Token

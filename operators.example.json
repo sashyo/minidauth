@@ -4,5 +4,5 @@
   { "name": "bob",   "tokenDigest": "replace-me-sha256-base64", "roles": ["approver"] },
   { "name": "carol", "tokenDigest": "replace-me-sha256-base64", "roles": ["approver"] },
 
-  { "name": "your-app", "tokenDigest": "replace-me-sha256-base64", "roles": ["relying-party"] }
+  { "name": "your-app", "publicKey": "replace-me-ed25519-spki-base64", "roles": ["relying-party"] }
 ]

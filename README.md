@@ -143,14 +143,27 @@ take Tide sign-ins and the token has no further use. Stop exporting it.
 For a real quorum before Tide admins exist, `cp operators.example.json operators.json` and list your
 operators instead; with a single admin token the approval threshold is 1.
 
-Put the token's digest in that file rather than the token, so the file is not itself worth stealing:
+An entry authenticates in exactly one of three ways, strongest last:
+
+| | |
+|---|---|
+| `token` | the token itself. Fine on a dev machine, a credential at rest |
+| `tokenDigest` | its SHA-256, base64. The file stops being worth stealing |
+| `publicKey` | an Ed25519 public key. Nothing here is a credential at all |
 
 ```sh
-printf %s "$TOKEN" | openssl dgst -sha256 -binary | base64
+printf %s "$TOKEN" | openssl dgst -sha256 -binary | base64      # for tokenDigest
+node examples/shared/keygen.js your-app                         # for publicKey
 ```
 
-A plain `token` still works for a dev machine. Both is refused, because it is never clear which one
-was meant to be authoritative.
+More than one is refused, because which is authoritative would be a guess, and guessing about
+credentials is how the weaker one quietly stays usable.
+
+**Prefer `publicKey` for applications.** The caller keeps a private key and proves it by signing a
+short-lived assertion, sent as `Authorization: Assertion <jwt>`. There is then no shared secret
+anywhere: a copy of this file grants nothing, and an assertion seen in transit is refused if replayed
+and expires in a minute regardless. It is the same argument as the rest of the project, applied to
+the one credential that was still a secret sitting in a file.
 
 Defaults point at the public Tide network, so there is nothing else to configure:
 

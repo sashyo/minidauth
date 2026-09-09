@@ -32,6 +32,12 @@ public final class ApiServer implements AutoCloseable {
 
     private final Config config;
     private final Operators operators;
+
+    /* Assertions are addressed to this service, and each is accepted once.
+     *
+     * The audience is the public URL rather than a name, so an assertion made for one deployment
+     * cannot be replayed against another. */
+    private final org.minidauth.auth.ClientAssertion clientAssertions;
     private final org.minidauth.auth.DokenOperators dokenOperators;
     private final VendorKeyStore keyStore;
     private final VrkLifecycle vrk;
@@ -47,6 +53,10 @@ public final class ApiServer implements AutoCloseable {
                      TideAuthService tideAuth) {
         this.config = config;
         this.operators = operators;
+        this.clientAssertions = new org.minidauth.auth.ClientAssertion(
+                config.publicUrl == null || config.publicUrl.isBlank()
+                        ? "http://localhost:" + config.port
+                        : config.publicUrl.replaceAll("/+$", ""));
         this.keyStore = keyStore;
         this.vrk = vrk;
         this.rotation = rotation;
@@ -570,7 +580,8 @@ public final class ApiServer implements AutoCloseable {
         String header = ex.getRequestHeaders().getFirst("Authorization");
         if (header == null) {
             throw new Json.HttpError(401, "Authorization is required: 'Doken <token>' from a Tide "
-                    + "sign-in, or 'Bearer <token>' for a configured operator");
+                    + "sign-in, 'Assertion <jwt>' signed by a client's key, or 'Bearer <token>' for "
+                    + "a configured operator");
         }
 
         if (header.startsWith(org.minidauth.auth.DokenOperators.SCHEME)) {
@@ -586,6 +597,22 @@ public final class ApiServer implements AutoCloseable {
         if (header.startsWith("Bearer ")) {
             return operators.authenticate(header.substring("Bearer ".length()).trim())
                     .orElseThrow(() -> new Json.HttpError(401, "Unknown operator token"));
+        }
+
+        /* A caller proving it holds a private key, rather than repeating a shared one.
+         *
+         * Preferred for applications: nothing this service stores can be presented as a credential,
+         * so a copy of the operators file is worth nothing on its own. */
+        if (header.startsWith("Assertion ")) {
+            String compact = header.substring("Assertion ".length()).trim();
+            String name;
+            try {
+                name = clientAssertions.verify(compact, operators::publicKeyFor);
+            } catch (org.minidauth.auth.ClientAssertion.Invalid e) {
+                throw new Json.HttpError(401, e.getMessage());
+            }
+            return operators.byName(name).orElseThrow(() ->
+                    new Json.HttpError(401, "Unknown client"));
         }
 
         throw new Json.HttpError(401, "Unsupported authorization scheme");

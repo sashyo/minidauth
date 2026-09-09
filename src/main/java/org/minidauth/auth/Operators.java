@@ -28,6 +28,12 @@ import java.util.Set;
 public final class Operators {
     private static final Log log = Log.of(Operators.class);
 
+    /** name -> operator, for the callers that sign an assertion instead of sharing a secret. */
+    private final Map<String, Operator> signingClients = new LinkedHashMap<>();
+
+    /** name -> its Ed25519 public key. */
+    private final Map<String, String> publicKeys = new LinkedHashMap<>();
+
     /** tokenDigest -> operator */
     private final Map<String, Operator> byTokenDigest = new LinkedHashMap<>();
 
@@ -51,26 +57,34 @@ public final class Operators {
                 }
                 boolean hasToken = e.token != null && !e.token.isBlank();
                 boolean hasDigest = e.tokenDigest != null && !e.tokenDigest.isBlank();
-                if (!hasToken && !hasDigest) {
+                boolean hasKey = e.publicKey != null && !e.publicKey.isBlank();
+                int ways = (hasToken ? 1 : 0) + (hasDigest ? 1 : 0) + (hasKey ? 1 : 0);
+                if (ways == 0) {
                     throw new IllegalStateException("Operator '" + e.name + "' in " + file
-                            + " has neither token nor tokenDigest");
+                            + " has none of token, tokenDigest or publicKey");
                 }
-                if (hasToken && hasDigest) {
+                if (ways > 1) {
+                    // Which one is authoritative would be a guess, and guessing about credentials is
+                    // how the weaker one quietly stays usable.
                     throw new IllegalStateException("Operator '" + e.name + "' in " + file
-                            + " has both token and tokenDigest; keep the digest and drop the token");
+                            + " has more than one way to authenticate; keep exactly one");
                 }
                 Set<Role> roles = EnumSet.noneOf(Role.class);
                 for (String r : e.roles) roles.add(Role.fromWire(r));
                 if (roles.isEmpty()) {
                     throw new IllegalStateException("Operator '" + e.name + "' in " + file + " has no roles");
                 }
-                // A digest goes in as it stands; a token is reduced to one on the way past.
-                operators.addDigest(e.name, hasDigest ? e.tokenDigest.trim() : digest(e.token), roles);
+                if (hasKey) {
+                    operators.addKey(e.name, e.publicKey.trim(), roles);
+                } else {
+                    // A digest goes in as it stands; a token is reduced to one on the way past.
+                    operators.addDigest(e.name, hasDigest ? e.tokenDigest.trim() : digest(e.token), roles);
+                }
             }
             log.info("Loaded operators from %s", file);
         }
 
-        if (operators.byTokenDigest.isEmpty()) {
+        if (operators.byTokenDigest.isEmpty() && operators.signingClients.isEmpty()) {
             log.warn("No operators configured. Set MC_ADMIN_TOKEN or provide an operators file, "
                     + "or nothing will be able to authenticate.");
         }
@@ -87,10 +101,33 @@ public final class Operators {
             throw new IllegalStateException("Operators '" + existing.name() + "' and '" + name
                     + "' share a token; approvals could not be told apart");
         }
-        if (byTokenDigest.values().stream().anyMatch(o -> o.name().equalsIgnoreCase(name))) {
+        requireNameIsFree(name);
+        byTokenDigest.put(digest, new Operator(name, roles));
+    }
+
+    private void addKey(String name, String publicKey, Set<Role> roles) {
+        requireNameIsFree(name);
+        publicKeys.put(name, publicKey);
+        signingClients.put(name, new Operator(name, roles));
+    }
+
+    /** Across both kinds, because a name is how an approval is attributed. */
+    private void requireNameIsFree(String name) {
+        boolean taken = byTokenDigest.values().stream().anyMatch(o -> o.name().equalsIgnoreCase(name))
+                || signingClients.keySet().stream().anyMatch(n -> n.equalsIgnoreCase(name));
+        if (taken) {
             throw new IllegalStateException("Duplicate operator name '" + name + "'");
         }
-        byTokenDigest.put(digest, new Operator(name, roles));
+    }
+
+    /** The public key an assertion from this name must verify against, or null. */
+    public String publicKeyFor(String name) {
+        return publicKeys.get(name);
+    }
+
+    /** The operator behind a name, once an assertion from it has verified. */
+    public Optional<Operator> byName(String name) {
+        return Optional.ofNullable(signingClients.get(name));
     }
 
     public Optional<Operator> authenticate(String token) {
@@ -99,7 +136,9 @@ public final class Operators {
     }
 
     public List<Operator> all() {
-        return new ArrayList<>(byTokenDigest.values());
+        List<Operator> out = new ArrayList<>(byTokenDigest.values());
+        out.addAll(signingClients.values());
+        return out;
     }
 
     /**
@@ -147,6 +186,14 @@ public final class Operators {
          * <pre>printf %s "$TOKEN" | openssl dgst -sha256 -binary | base64</pre>
          */
         public String tokenDigest;
+        /**
+         * An Ed25519 public key, base64 X.509, instead of any shared secret.
+         *
+         * <p>The strongest of the three. The caller keeps the private key and proves it by signing a
+         * short-lived assertion, so nothing here can be presented as a credential and a copy of this
+         * file is worth nothing on its own.
+         */
+        public String publicKey;
         public List<String> roles = List.of();
     }
 }

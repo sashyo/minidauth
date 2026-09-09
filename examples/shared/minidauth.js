@@ -14,15 +14,53 @@
  * It authenticates this app to minidauth, not minidauth to this app, so anywhere but localhost the
  * connection between the two wants TLS like any other trusted call.
  */
+import crypto from "node:crypto";
+
 const BASE = () => process.env.MINIDAUTH_URL ?? "http://localhost:8081";
 const TOKEN = () => process.env.MINIDAUTH_TOKEN ?? "dev-sample-app-token";
+const CLIENT_NAME = () => process.env.MINIDAUTH_CLIENT_NAME;
+const CLIENT_KEY = () => process.env.MINIDAUTH_CLIENT_KEY;
+
+const b64url = (b) => Buffer.from(b).toString("base64url");
+
+/**
+ * Prove we hold the private key, without sending anything reusable.
+ *
+ * Signed fresh for each call and good for a minute, so an assertion seen in transit is worth
+ * nothing by the time anyone could use it. minidauth also refuses a jti it has seen before.
+ */
+function assertion() {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "EdDSA", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({
+    iss: CLIENT_NAME(),
+    aud: BASE(),
+    iat: now,
+    exp: now + 60,
+    jti: crypto.randomUUID(),
+  }));
+  const key = crypto.createPrivateKey({
+    key: Buffer.from(CLIENT_KEY(), "base64"),
+    format: "der",
+    type: "pkcs8",
+  });
+  const signature = crypto.sign(null, Buffer.from(`${header}.${claims}`), key);
+  return `${header}.${claims}.${b64url(signature)}`;
+}
+
+/** A signing key if there is one, the shared token otherwise. */
+function authorization() {
+  return CLIENT_NAME() && CLIENT_KEY()
+    ? "Assertion " + assertion()
+    : "Bearer " + TOKEN();
+}
 
 async function call(path, init = {}) {
   const res = await fetch(BASE() + path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Bearer " + TOKEN(),
+      Authorization: authorization(),
       ...(init.headers ?? {}),
     },
   });
