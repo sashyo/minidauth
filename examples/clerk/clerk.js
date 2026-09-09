@@ -43,6 +43,16 @@ export async function currentUser(req) {
  * can put metadata into a session token, and a role in a token this app can mint is a role this app
  * can grant itself.
  */
+/** The stored user, by id, for the callback that cannot ask Clerk who is calling. */
+export async function userById(userId) {
+  const user = await clerk().users.getUser(userId);
+  return {
+    id: user.id,
+    email: user.primaryEmailAddress?.emailAddress,
+    vuid: user.privateMetadata?.tideVuid ?? null,
+  };
+}
+
 export async function storeVuid(userId, vuid) {
   await clerk().users.updateUserMetadata(userId, { privateMetadata: { tideVuid: vuid } });
 }

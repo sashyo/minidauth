@@ -7,7 +7,7 @@ change: [`shared/minidauth.js`](shared/minidauth.js) is the same file in all of 
 |---|---|---|
 | [better-auth](better-auth) | :3000 | Runs locally, exercised against the live network |
 | [supabase](supabase) | :3004 | **Run end to end**, with a [walkthrough](supabase#what-it-looks-like) |
-| [clerk](clerk) | :3003 | Free tier, no card |
+| [clerk](clerk) | :3003 | **Run end to end**, with a [walkthrough](clerk#what-it-looks-like) |
 | [auth0](auth0) | :3002 | Free tier, no card |
 | [cognito](cognito) | :3001 | `npm run setup` builds the pool, but AWS wants a card |
 

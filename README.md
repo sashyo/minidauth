@@ -83,9 +83,10 @@ Everything above runs against the public Tide network, not a simulator:
 - A value encrypted under a deployed policy and decrypted back through one gated on a role.
 - A role grant refused by the network until an administrator approved it in their enclave.
 - Sign-in, token minting with attested roles, key rotation and licensing.
-- A [Supabase app](examples/supabase) linking its users to Tide identities and reading authorisation
-  from the quorum, recorded step by step. Better Auth the same, locally. Clerk, Auth0 and Cognito
-  share their minidauth code but have not been run against real accounts.
+- [Supabase](examples/supabase) and [Clerk](examples/clerk) apps linking their users to Tide
+  identities and reading authorisation from the quorum, both recorded step by step. Better Auth the
+  same, locally. Auth0 and Cognito share their minidauth code but have not been run against real
+  accounts.
 
 What is not: policy *deployment* is still gated by this service rather than the network, for a
 reason explained under [governance](#what-the-network-enforces-and-what-this-service-does).
@@ -281,7 +282,7 @@ from the grant record on every request rather than from the app's own database.
 |---|---|
 | [better-auth](examples/better-auth) | Runs locally, exercised against the live network |
 | [supabase](examples/supabase) | Run end to end, with screenshots of the whole flow |
-| [clerk](examples/clerk) | Free tier, no card |
+| [clerk](examples/clerk) | Run end to end, with screenshots of the whole flow |
 | [auth0](examples/auth0) | Free tier, no card |
 | [cognito](examples/cognito) | `npm run setup` builds the pool, but AWS wants a card |
 
