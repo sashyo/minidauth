@@ -11,10 +11,13 @@ Built on the [Tide protocol](https://tide.org), and distilled from
 fork. minidauth lifts the key lifecycle and governance out of TideCloak so any auth system can use
 them.
 
-> **Status.** Identity, tokens and quorum governance work and are exercised against a live Tide
-> network. Encryption is not proven end to end yet. It needs a deployed policy, which works, but the
-> order you deploy policies in matters and getting it wrong strands the key. See "things that will
-> bite you".
+> **Status.** Identity, tokens, quorum governance and encryption all work against the public Tide
+> network. A value has been encrypted under a deployed policy and decrypted back through one gated on
+> a role. What is not yet enforced by the network is *who may approve a role grant*: today that is
+> this service's own operator quorum rather than a policy the ORKs check. See "governance".
+>
+> The order you do things in matters more than anything else here, and getting it wrong strands the
+> key permanently. Follow the quick start in order and read "things that will bite you".
 
 ## Why
 
@@ -39,6 +42,27 @@ alone, especially your application.
 ## Quick start
 
 ```sh
+cp /path/to/MidgardJava-1.0-SNAPSHOT.jar vendor/   # not on Maven Central, see below
+MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up
+```
+
+That is the whole install. The image builds the service and runs it on :8081, and the `public`
+profile publishes one endpoint, explained next.
+
+**Why `--profile public`.** Sign-in happens inside the Tide enclave, a page served from the ORK's
+own origin, and that page has to fetch a voucher back from this service. Browsers refuse a request
+from a public page to a loopback address, so on a laptop the sign-in stops there. The profile starts
+a `cloudflared` tunnel that gives the voucher endpoint an address the browser will accept. Only that
+endpoint answers on it; the console, the ops routes and the governance API return 404 there, matched
+on the host the request arrived on. Drop the profile if this service already has a public URL, and
+set `MC_VOUCHER_PUBLIC_URL` to it instead.
+
+**MidgardJava** is a Tide library, not on Maven Central and not redistributed here, so put the jar in
+`vendor/` before building. The native library rides inside it, so nothing else is needed.
+
+Without Docker, and with a JDK 17+ and Maven:
+
+```sh
 export MC_ADMIN_TOKEN=$(openssl rand -hex 32)   # bootstrap only, see below
 export MC_PUBLIC_URL=http://localhost:8081      # how a browser reaches this service
 mvn -q package -DskipTests && ./run.sh          # :8081
@@ -60,6 +84,11 @@ Defaults point at the public Tide network, so there is nothing else to configure
 | `SYSTEM_HOME_ORK` | `https://ork1.tideprotocol.com` |
 | `PAYER_PUBLIC` | `200000b967a7799ffd4476e1074777ebc83bec23a3843cb2e5ca43c83561802c8e646b` |
 | `THRESHOLD_T` / `THRESHOLD_N` | 14 of 20 |
+| `MC_POLICY_VERSION` | `3` |
+
+`MC_POLICY_VERSION` exists because the bindings build policy version 4 and the released network
+understands 3. Deploying without it fails with "Error with signing model: Policy:1", and the reason,
+"Could not find specified policy version: 4", is in a response body the bindings discard.
 
 `PAYER_PUBLIC` must match the network in `SYSTEM_HOME_ORK`, or you get "Payer &lt;key&gt; not found"
 and no other clue.
@@ -105,7 +134,23 @@ curl -sX POST localhost:8081/iga/change-requests/$CR/commit    -H "Authorization
 
 Repeat for `vault-writer`, and `governance-admin` for anyone who should administer.
 
-**5. Encrypt and decrypt.** Not yet, and this is the honest state of the project. See below.
+**5. Deploy the policies.** In this order, and only after step 4, because signing the first policy
+spends the VRK's authorizer pack and that pack is the only thing that can attest a role until a
+policy exists. The service refuses the first deployment until somebody holds `governance-admin`,
+because there is no way back from getting this wrong.
+
+| | |
+|---|---|
+| bootstrap | `AttestationUnit:1` + `Policy:1`, IMPLICIT, PUBLIC |
+| encrypt | `PolicyEnabledEncryption:1`, IMPLICIT, PUBLIC |
+| decrypt | `PolicyEnabledDecryption:1`, IMPLICIT, PRIVATE, `params.role` |
+
+The bootstrap has to cover both models: units alone means no further policies, `Policy:1` alone means
+no tokens. Its contract refuses the two unit types that confer a role, so the policy that replaces
+the pack cannot be used to hand anybody one.
+
+**6. Encrypt and decrypt.** Open `/console/vault`, which runs one of each through the enclave. This
+is a test harness rather than product UI, and it is the shortest way to see the whole chain work.
 
 ## How it fits
 
@@ -180,6 +225,27 @@ the stored bytes means the file records what was agreed instead of deciding it.
 
 Operators sign in at `/console` with Tide. Nothing long-lived is stored anywhere.
 
+### What the network enforces, and what this service does
+
+Worth separating, because the console does not yet make the difference obvious.
+
+| | decided by |
+|---|---|
+| who may decrypt | the ORKs, from the role in your doken, against the deployed decrypt policy |
+| which units may be signed at all | the ORKs, from the bootstrap contract |
+| whether a role grant has enough approvals | **this service** |
+| whether a policy deployment has enough approvals | **this service** |
+
+The first two are cryptographic: a compromised host cannot decrypt without a role, and cannot sign
+the units that would grant itself one. The last two are not. They are checked here, by this process,
+against the approval threshold, so someone who owns the machine can approve their own change.
+
+Closing that means an EXPLICIT policy over `AttestationUnit:1` whose contract counts admin dokens,
+with role units routed to it, and the same for `Policy:1`. The bootstrap policy is IMPLICIT precisely
+because it cannot be: attestation units are signed on every sign-in, and a policy demanding approvals
+for those means no token can ever be minted, including the admin tokens it is waiting for. Breaking
+that circle is the remaining work.
+
 ## Things that will bite you
 
 **The first policy you deploy decides what the key can do afterwards.** The VRK's authorizer pack
@@ -195,11 +261,17 @@ is verified, a key with a policy deployed still mints tokens.
 Scope that first policy too narrowly and you are stuck. A policy over `AttestationUnit:1` alone
 keeps tokens working but cannot authorise deploying anything else.
 
-**Encryption is not proven end to end yet.** The route is the policy one, in the browser with
-tide-js, and it needs an encrypt policy deployed under a first policy scoped as above. The Java
-bindings also expose local encrypt and decrypt calls, but they take a complete private key and make
-no network calls at all, so they belong to deployments that have reconstructed their key and left
-the network. This service does not use them and should not.
+**Encryption runs in the browser, not here.** The Java bindings do expose local encrypt and decrypt
+calls, but they take a complete private key and make no network calls at all, so they belong to
+deployments that have reconstructed their key and left the network. This service does not use them
+and should not. The real route is a policy, applied inside the enclave, which is what `/console/vault`
+demonstrates.
+
+**A browser will not let the enclave reach localhost.** Sign-in happens on the ORK's public origin
+and that page has to fetch a voucher back from this service; browsers refuse a public page's request
+to a loopback address, and it surfaces as a bare network failure. Run `docker compose --profile
+public up`, or point `MC_VOUCHER_PUBLIC_URL` at an address the browser will accept. A deployed
+service on a public URL never meets this.
 
 **Tide accounts outlive your vendor key.** They live on the network, so deleting the key and starting
 again does not reset your users, and reusing a username returns 409.

@@ -72,6 +72,7 @@ public final class TideAuthService {
     private static final String MAPPER_VUID = "mc-pm-vuid";
     private static final String MAPPER_AUDIENCE = "mc-pm-audience";
     private static final String MAPPER_REALM_ROLES = "mc-pm-realm-roles";
+    private static final String MAPPER_HOME_ORK = "mc-pm-home-ork";
 
     private static final String DEFAULT_ENCLAVE_TYPE = "cmkOnly";
 
@@ -373,8 +374,7 @@ public final class TideAuthService {
                 .sessionId(authRequest.SessionId)
                 .userKey(userPublic)
                 .vuid(vuid)
-                // No t.uho: the home-ORK claim has no mapper behind it, and every claim on the
-                // access token must trace back to an attested source or the request is refused.
+                .homeOrk(store.get(VendorKeyStore.SYSTEM_HOME_ORK_URL))
                 .issuedAt(Instant.now().getEpochSecond())
                 .expiresAt(exp)
                 .audience(vvkId)
@@ -408,6 +408,15 @@ public final class TideAuthService {
         byte[] vuidMapper = AttestationUnits.attributeMapper(
                 MAPPER_VUID, vvkId, AttestationUnits.ATTR_VUID, "vuid");
         byte[] audienceMapper = AttestationUnits.audienceMapper(MAPPER_AUDIENCE, vvkId, vvkId);
+        /* t.uho, the user's home ORK.
+         *
+         * Hardcoded rather than projected from an attribute, because a fresh self-registered
+         * identity may carry only {vuid, tideUserKey, username, firstName, lastName, email} and the
+         * ORK refuses the whole unit over anything else. The enclave will not accept a doken
+         * without this claim, though nothing it does with it beyond diagnostics, so the honest
+         * value is the network the identity was proven against. */
+        byte[] homeOrkMapper = AttestationUnits.hardcodedClaimMapper(
+                MAPPER_HOME_ORK, vvkId, "t.uho", store.get(VendorKeyStore.SYSTEM_HOME_ORK_URL));
 
         // Roles, when the governed record grants any. Three units are needed, not one: what each
         // role IS (role_definition), that this user HOLDS it (user_role_mapping_set), and that the
@@ -415,10 +424,10 @@ public final class TideAuthService {
         // naming a role nobody ever defined, and stops a token claiming a role nobody granted.
         java.util.List<byte[]> units = new java.util.ArrayList<>(
                 java.util.List.of(realmEnvelope, clientEnvelope, scopeEnvelope,
-                        userKeyMapper, vuidMapper, audienceMapper));
+                        userKeyMapper, vuidMapper, audienceMapper, homeOrkMapper));
         java.util.List<String[]> preSigned = java.util.List.of();
         java.util.List<String> mapperIds = new java.util.ArrayList<>(
-                java.util.List.of(MAPPER_TIDE_USER_KEY, MAPPER_VUID, MAPPER_AUDIENCE));
+                java.util.List.of(MAPPER_TIDE_USER_KEY, MAPPER_VUID, MAPPER_AUDIENCE, MAPPER_HOME_ORK));
 
         if (!roles.isEmpty()) {
             // The role units were signed when the grant was committed, so they are replayed here

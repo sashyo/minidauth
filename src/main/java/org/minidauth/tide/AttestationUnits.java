@@ -111,6 +111,12 @@ public final class AttestationUnits {
             throw new IllegalArgumentException(
                     "A self-registered identity must carry the user's public key as tideUserKey");
         }
+        /* Only these two, and only ever these two.
+         *
+         * A fresh self-registered identity may carry vuid, tideUserKey, username, firstName,
+         * lastName and email, and nothing else: the ORK refuses the whole unit over any other
+         * attribute rather than dropping it. So a claim that needs a per-deployment value cannot be
+         * smuggled in here as an attribute; it needs a mapper that carries the value itself. */
         Map<String, List<String>> attributes = new LinkedHashMap<>();
         attributes.put(ATTR_VUID, List.of(vuid));
         attributes.put(ATTR_TIDE_USER_KEY, List.of(userPublic));
@@ -237,6 +243,38 @@ public final class AttestationUnits {
         config.put("access.token.claim", "true");
         return protocolMapper(protocolMapperId, "client", clientIdUuid,
                 "oidc-usermodel-attribute-mapper", config);
+    }
+
+    /**
+     * Escape a claim name so it stays one claim.
+     *
+     * <p>A dot in a mapper's claim name is a path separator: the ORK splits on it and nests, so
+     * {@code t.uho} would be attested as {@code {"t":{"uho":...}}} while the token carries it flat,
+     * and the two never match. Backslash escaping the dots is what says "this is a name, not a
+     * path".
+     */
+    private static String escapeClaimName(String claimName) {
+        return claimName.replace(".", "\\.");
+    }
+
+    /**
+     * Puts a fixed value in a claim.
+     *
+     * <p>For claims whose value belongs to the deployment rather than the user, so there is no
+     * attribute to project. The value travels inside the mapper, which means it is attested as
+     * configuration: the cohort signs the mapper that would produce the claim, and the validation
+     * engine then reproduces it and compares. A token asserting a different value than the attested
+     * mapper produces is refused, which is the property that matters.
+     */
+    public static byte[] hardcodedClaimMapper(String protocolMapperId, String clientIdUuid,
+                                              String claimName, String claimValue) {
+        Map<String, String> config = new LinkedHashMap<>();
+        config.put("claim.name", escapeClaimName(claimName));
+        config.put("claim.value", claimValue);
+        config.put("jsonType.label", "String");
+        config.put("access.token.claim", "true");
+        return protocolMapper(protocolMapperId, "client", clientIdUuid,
+                "oidc-hardcoded-claim-mapper", config);
     }
 
     /**

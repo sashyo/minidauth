@@ -367,10 +367,15 @@ public final class ApiServer implements AutoCloseable {
          * wrapping it in an object leaves the field it reads undefined and the failure surfaces far
          * away as "Cannot read properties of undefined". */
         router.post("/tide/vouchers", (ex, p) -> {
-            authenticate(ex);
-            Map<String, Object> body = Json.readBody(ex);
+            /* Two ways in. An operator, as before, or a sign-in this service started, which is how
+             * the enclave gets here: it runs in the user's browser and has no credential to
+             * present. Anything else is turned away, because issuing a voucher spends the VRK and
+             * draws on the licence's account quota. */
+            if (!isLiveSignInSession(Router.query(ex).get("session"))) {
+                authenticate(ex);
+            }
             Json.sendRaw(ex, 200,
-                    tideAuth.vouchers(Json.requireString(body, "voucherRequest")),
+                    tideAuth.vouchers(voucherRequestFrom(ex)),
                     "application/json; charset=utf-8");
         });
 
@@ -403,6 +408,14 @@ public final class ApiServer implements AutoCloseable {
 
         router.get("/console", (ex, p) -> Json.sendRaw(ex, 200, console(), "text/html; charset=utf-8"));
 
+        /* A page that runs one encrypt and one decrypt through the enclave, end to end.
+         *
+         * Served from the console's own origin so it can reuse that sign-in: the doken is bound to
+         * a session key that lives in the enclave window, so a page on another origin would have to
+         * start its own sign-in and would get a different key. */
+        router.get("/console/vault", (ex, p) ->
+                Json.sendRaw(ex, 200, asset("/console/vault.html"), "text/html; charset=utf-8"));
+
         /* Start a sign-in. Unauthenticated on purpose: this IS the way to get a credential, so
            requiring one would be circular. Nothing secret is returned, the login URL carries the
            authorizer pack and signatures over public values, and the redirect target is the
@@ -410,19 +423,39 @@ public final class ApiServer implements AutoCloseable {
            used to point a Tide sign-in at somebody else's page. */
         router.post("/console/session/login-url", (ex, p) -> {
             Map<String, Object> body = Json.readBody(ex);
+            String sessionId = Json.requireString(body, "sessionId");
+            rememberSignInSession(sessionId);
+
+            /* Serve our own vouchers unless pointed elsewhere. The console is meant to work on its
+             * own, and an unset MC_VOUCHER_URL used to mean it could not sign anyone in at all. */
             String voucherUrl = config.voucherUrl;
-            if (voucherUrl == null) {
-                throw new Json.HttpError(400, "MC_VOUCHER_URL is not configured, so the enclave has "
-                        + "nowhere to fetch a voucher from");
+            if (voucherUrl == null || voucherUrl.isBlank()) {
+                voucherUrl = voucherBase() + "/tide/vouchers?session="
+                        + java.net.URLEncoder.encode(sessionId, java.nio.charset.StandardCharsets.UTF_8);
             }
+
             java.net.URI url = tideAuth.loginUrl(
-                    Json.requireString(body, "sessionId"),
+                    sessionId,
                     consoleRedirectUri(),
                     voucherUrl,
                     null,
                     org.minidauth.tide.TideAuthService.requireEnclaveType(
                             Json.string(body, "enclaveType")));
             Json.send(ex, 200, Map.of("url", url.toString()));
+        });
+
+        /* A voucher URL for an enclave window this page is about to open.
+         *
+         * Every enclave flow needs one, not just sign-in: the enclave refuses to start without it
+         * and dies before it announces itself, so a caller that omits it sees a window that never
+         * replies rather than an error. Registering the session here is what lets the voucher
+         * endpoint tell this window apart from an anonymous caller. */
+        router.post("/console/session/voucher-url", (ex, p) -> {
+            authenticate(ex);
+            String sessionId = "enclave-" + java.util.UUID.randomUUID();
+            rememberSignInSession(sessionId);
+            Json.send(ex, 200, Map.of("voucherUrl", voucherBase() + "/tide/vouchers?session="
+                    + java.net.URLEncoder.encode(sessionId, java.nio.charset.StandardCharsets.UTF_8)));
         });
 
         /* Finish a sign-in and hand back the doken.
@@ -458,6 +491,43 @@ public final class ApiServer implements AutoCloseable {
          *
          * Encryption here goes through a policy instead, in the browser, with tide-js. The policy
          * bytes are served openly by /vault/encrypt-policy below. */
+
+        /* The encrypt policy, for any browser that wants to encrypt.
+         *
+         * Unauthenticated on purpose. Encrypting is the open half of this design: a public form has
+         * to be able to encrypt what it collects, so the writing side holds nothing worth stealing.
+         * The bytes here are a signed policy the ORKs already enforce, not a credential, and the
+         * cohort checks that signature regardless of who presents it.
+         *
+         * Only a policy scoped solely to encryption is ever served, so a wider policy that happens
+         * to include the encrypt model cannot be handed out here by accident. */
+        /* The decrypt policy. Authenticated, unlike its encrypt counterpart, because it is only
+         * useful to someone who already holds the role it names, and there is no reason to hand the
+         * shape of the reading side to anyone who asks. */
+        router.get("/vault/decrypt-policy", (ex, p) -> {
+            authenticate(ex);
+            var policy = gov.publicDecryptPolicy().orElseThrow(() -> new Json.HttpError(404,
+                    "No decryption policy is deployed"));
+            Json.send(ex, 200, Map.of(
+                    "policyId", policy.policyId,
+                    "contractId", policy.contractId,
+                    "vvkId", policy.keyId,
+                    "modelIds", policy.modelIds,
+                    "params", policy.params == null ? Map.of() : policy.params,
+                    "policy", policy.policyBytes));
+        });
+
+        router.get("/vault/encrypt-policy", (ex, p) -> {
+            var policy = gov.publicEncryptPolicy().orElseThrow(() -> new Json.HttpError(404,
+                    "No encryption policy is deployed, so there is nothing a browser could encrypt "
+                    + "under yet"));
+            Json.send(ex, 200, Map.of(
+                    "policyId", policy.policyId,
+                    "contractId", policy.contractId,
+                    "vvkId", policy.keyId,
+                    "modelIds", policy.modelIds,
+                    "policy", policy.policyBytes));
+        });
 
         router.get("/operators", (ex, p) -> {
             authenticate(ex);
@@ -518,11 +588,230 @@ public final class ApiServer implements AutoCloseable {
      * would turn this into an open redirector for a Tide sign-in, which is the one thing the signed
      * redirect URI exists to prevent.
      */
-    private String consoleRedirectUri() {
-        String base = config.publicUrl == null || config.publicUrl.isBlank()
+    /* Sign-in sessions this service started, and when they expire.
+     *
+     * Their only job is to gate voucher issuance. A voucher costs the VRK and draws on the
+     * licence's account quota, so the endpoint cannot simply be open; but the enclave fetching one
+     * runs in the user's browser and has no operator credential to present. Recording the session
+     * when the login URL is built means the endpoint can tell a sign-in this service started from
+     * an anonymous caller, without the enclave having to carry anything extra.
+     *
+     * In memory on purpose. A session outliving a restart buys nothing: the sign-in it belongs to
+     * is over long before. */
+    private final Map<String, Long> signInSessions = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final long SESSION_TTL_MS = 10 * 60 * 1000L;
+    private static final int MAX_SESSIONS = 10_000;
+
+    private void rememberSignInSession(String sessionId) {
+        long now = System.currentTimeMillis();
+        signInSessions.values().removeIf(expiry -> expiry < now);
+        // A cap rather than an eviction policy: this is a bound on memory, not a cache.
+        if (signInSessions.size() >= MAX_SESSIONS) {
+            throw new Json.HttpError(503, "Too many sign-ins in flight; try again shortly");
+        }
+        signInSessions.put(sessionId, now + SESSION_TTL_MS);
+    }
+
+    private boolean isLiveSignInSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) return false;
+        Long expiry = signInSessions.get(sessionId);
+        if (expiry == null) return false;
+        if (expiry < System.currentTimeMillis()) {
+            signInSessions.remove(sessionId);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Allow the enclave, and only the enclave, to call the voucher endpoint from its own origin.
+     *
+     * <p>Scoped deliberately narrowly. The origin has to match the ORK network this service is
+     * configured against, and the path has to be the voucher route, because that is the only thing
+     * a browser reaches cross-origin here. Everything else is same-origin from the console.
+     *
+     * <p>The private-network header is what makes this work at all in current Chrome: a page on a
+     * public HTTPS origin reaching {@code localhost} is a private network request, and the preflight
+     * is refused without it. Its absence looks like a plain network failure with no status, which is
+     * why it is worth naming.
+     *
+     * @return true if this request is a cross-origin enclave call that was allowed
+     */
+    /**
+     * Pull {@code voucherRequest} out of the request, whatever shape it arrives in.
+     *
+     * <p>The enclave sends a {@code FormData}, so this is multipart with a boundary rather than the
+     * JSON everything else here speaks. That is not negotiable from this end, and reading it wrong
+     * shows up as a bare 400 with no hint that the body was the problem, so both shapes are
+     * accepted and anything else says plainly what it got.
+     */
+    @SuppressWarnings("unchecked")
+    private static String voucherRequestFrom(HttpExchange ex) throws IOException {
+        String contentType = ex.getRequestHeaders().getFirst("Content-Type");
+        byte[] raw;
+        try (java.io.InputStream in = ex.getRequestBody()) {
+            raw = in.readAllBytes();
+        }
+
+        if (contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data")) {
+            String value = multipartField(raw, contentType, "voucherRequest");
+            if (value == null) {
+                throw new Json.HttpError(400, "multipart body has no voucherRequest field");
+            }
+            return value;
+        }
+
+        // Anything else is treated as the JSON the rest of the API uses.
+        Map<String, Object> body;
+        try {
+            body = raw.length == 0
+                    ? new LinkedHashMap<>()
+                    : Json.mapper().readValue(raw, LinkedHashMap.class);
+        } catch (com.fasterxml.jackson.core.JacksonException e) {
+            throw new Json.HttpError(400, "Expected a multipart form or JSON body, got "
+                    + (contentType == null ? "no content type" : contentType));
+        }
+        return Json.requireString(body, "voucherRequest");
+    }
+
+    /**
+     * Read one named field out of a multipart body.
+     *
+     * <p>Deliberately small: the enclave sends a handful of short text fields and no files, so this
+     * splits on the boundary and reads the part whose disposition carries the name. It decodes as
+     * UTF-8 because every field the enclave sends is text.
+     *
+     * @return the field's value, or null if the body does not contain it
+     */
+    private static String multipartField(byte[] raw, String contentType, String name) {
+        int at = contentType.toLowerCase(java.util.Locale.ROOT).indexOf("boundary=");
+        if (at < 0) return null;
+        String boundary = contentType.substring(at + "boundary=".length()).trim();
+        if (boundary.startsWith("\"")) {
+            int end = boundary.indexOf('"', 1);
+            boundary = end < 0 ? boundary.substring(1) : boundary.substring(1, end);
+        }
+        int semi = boundary.indexOf(';');
+        if (semi >= 0) boundary = boundary.substring(0, semi).trim();
+
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        for (String part : body.split(java.util.regex.Pattern.quote("--" + boundary))) {
+            // Headers and value are separated by a blank line, as in any multipart part.
+            int split = part.indexOf("\r\n\r\n");
+            int skip = 4;
+            if (split < 0) {
+                split = part.indexOf("\n\n");
+                skip = 2;
+            }
+            if (split < 0) continue;
+
+            String headers = part.substring(0, split);
+            if (!headers.contains("name=\"" + name + "\"")) continue;
+
+            String value = part.substring(split + skip);
+            // Trim the CRLF the next boundary is preceded by.
+            while (value.endsWith("\r") || value.endsWith("\n") || value.endsWith("-")) {
+                value = value.substring(0, value.length() - 1);
+            }
+            return value;
+        }
+        return null;
+    }
+
+    private boolean applyEnclaveCors(HttpExchange ex, String path) {
+        if (!"/tide/vouchers".equals(path)) return false;
+
+        String origin = ex.getRequestHeaders().getFirst("Origin");
+        if (origin == null || origin.isBlank()) return false;
+        if (!origin.equals(enclaveOrigin())) return false;
+
+        var out = ex.getResponseHeaders();
+        out.set("Access-Control-Allow-Origin", origin);
+        out.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+        out.set("Access-Control-Allow-Headers", "Content-Type");
+        out.set("Access-Control-Allow-Private-Network", "true");
+        out.set("Access-Control-Max-Age", "600");
+        out.set("Vary", "Origin");
+        return true;
+    }
+
+    /** True when this request arrived on the address the voucher endpoint is published at. */
+    private boolean isPublishedVoucherHost(HttpExchange ex) {
+        String base = config.voucherPublicUrl;
+        if (base == null || base.isBlank()) base = voucherUrlFromFile();
+        if (base == null || base.isBlank()) return false;
+
+        String host = ex.getRequestHeaders().getFirst("Host");
+        if (host == null || host.isBlank()) return false;
+        try {
+            String published = java.net.URI.create(base.replaceAll("/+$", "")).getHost();
+            return published != null
+                    && published.equalsIgnoreCase(host.split(":", 2)[0]);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** The scheme and host of the configured home ORK, which is where the enclave is served from. */
+    private String enclaveOrigin() {
+        try {
+            java.net.URI u = java.net.URI.create(config.homeOrkUrl);
+            int port = u.getPort();
+            return u.getScheme() + "://" + u.getHost() + (port == -1 ? "" : ":" + port);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Where the enclave reaches the voucher endpoint, which need not be where the console is. */
+    private String voucherBase() {
+        String configured = config.voucherPublicUrl;
+        if (configured == null || configured.isBlank()) {
+            configured = voucherUrlFromFile();
+        }
+        return configured == null || configured.isBlank()
+                ? publicBase()
+                : configured.replaceAll("/+$", "");
+    }
+
+    /**
+     * The address a tunnel published, if one has.
+     *
+     * <p>Read per call rather than cached, because the file appears seconds after this service
+     * starts and may change if the tunnel reconnects. It is one small local read on a path this
+     * service was configured with, not something a request can influence.
+     */
+    private String voucherUrlFromFile() {
+        String path = config.voucherPublicUrlFile;
+        if (path == null || path.isBlank()) return null;
+        try {
+            String value = java.nio.file.Files.readString(java.nio.file.Path.of(path)).trim();
+            return value.isBlank() ? null : value;
+        } catch (java.io.IOException e) {
+            // No tunnel yet, or none at all. Both are ordinary.
+            return null;
+        }
+    }
+
+    private String publicBase() {
+        return config.publicUrl == null || config.publicUrl.isBlank()
                 ? "http://localhost:" + config.port
                 : config.publicUrl.replaceAll("/+$", "");
-        return base + "/console";
+    }
+
+    private String consoleRedirectUri() {
+        return publicBase() + "/console";
+    }
+
+    /** Any console asset, loaded from the jar. */
+    private static String asset(String path) {
+        try (java.io.InputStream in = ApiServer.class.getResourceAsStream(path)) {
+            if (in == null) throw new Json.HttpError(500, "Missing from this build: " + path);
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new Json.HttpError(500, "Could not read " + path + ": " + e.getMessage());
+        }
     }
 
     /** The console page, loaded from the jar. */
@@ -554,6 +843,26 @@ public final class ApiServer implements AutoCloseable {
     private void dispatch(HttpExchange ex) throws IOException {
         String method = ex.getRequestMethod();
         String path = ex.getRequestURI().getPath();
+
+        /* A published address serves the voucher endpoint and nothing else.
+         *
+         * When the voucher endpoint is reachable from the internet so the enclave can call it, the
+         * console, the ops routes and the governance API must not come with it. They are recognised
+         * by the host they arrived on rather than by a separate proxy, so there is one service to
+         * run and one place the rule lives. */
+        if (isPublishedVoucherHost(ex) && !"/tide/vouchers".equals(path)) {
+            Json.sendError(ex, 404, "This address serves the voucher endpoint only");
+            return;
+        }
+
+        // The enclave runs on the ORK's own origin and fetches vouchers from here, so that one
+        // route needs CORS. Nothing else does: the console is served from this origin.
+        if (applyEnclaveCors(ex, path) && "OPTIONS".equals(method)) {
+            ex.sendResponseHeaders(204, -1);
+            ex.close();
+            return;
+        }
+
         try {
             Map<String, String> params = new LinkedHashMap<>();
             Router.Handler handler = router.match(method, path, params);

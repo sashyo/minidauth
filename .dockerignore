@@ -1,0 +1,6 @@
+data/
+data.bak*/
+target/
+operators.json
+.git/
+*.png

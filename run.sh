@@ -31,11 +31,10 @@ export MC_PORT="${MC_PORT:-8081}"
 export MC_DATA_DIR="${MC_DATA_DIR:-$HERE/data}"
 export MC_ADMIN_TOKEN="${MC_ADMIN_TOKEN:-dev-admin-token}"
 export MC_OPERATORS_FILE="${MC_OPERATORS_FILE:-$HERE/operators.json}"
-# Where the enclave fetches a voucher from, in the user's browser. Points at the WordPress proxy
-# because issuing a voucher needs the VRK and draws on the licence's account quota, so the service
-# will not hand them out unauthenticated. Making the console self-contained means solving that
-# properly rather than opening the endpoint.
-export MC_VOUCHER_URL="${MC_VOUCHER_URL:-http://localhost:8090/index.php?rest_route=/tide-ef/v1/vouchers}"
+# Where the enclave fetches a voucher from, in the user's browser. Left unset, the service serves
+# its own at /tide/vouchers, gated on a sign-in it started. Set this only to point the enclave at a
+# different issuer.
+export MC_VOUCHER_URL="${MC_VOUCHER_URL:-}"
 # Where a browser reaches this service, for the console's signed redirect URI.
 export MC_PUBLIC_URL="${MC_PUBLIC_URL:-http://localhost:8081}"
 

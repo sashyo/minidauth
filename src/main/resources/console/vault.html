@@ -1,0 +1,227 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>minidauth vault round trip</title>
+<style>
+  :root { --paper:#ece9e2; --rule:#0e0e0c; --signal:#d6371c; }
+  body { margin:0; padding:32px; background:var(--paper); color:var(--rule);
+         font:14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h1 { font-size:15px; text-transform:uppercase; letter-spacing:.12em;
+       background:var(--rule); color:var(--paper); display:inline-block; padding:6px 10px; margin:0 0 20px; }
+  fieldset { border:2px solid var(--rule); margin:0 0 18px; padding:14px; box-shadow:6px 6px 0 var(--rule); background:var(--paper); }
+  legend { text-transform:uppercase; letter-spacing:.1em; font-size:12px; padding:0 6px; }
+  input, button { font:inherit; border:2px solid var(--rule); background:var(--paper); padding:7px 10px; }
+  input { width:min(520px, 100%); }
+  button { cursor:pointer; box-shadow:3px 3px 0 var(--rule); }
+  button:active { transform:translate(3px,3px); box-shadow:none; }
+  button[disabled] { opacity:.45; cursor:default; }
+  pre { white-space:pre-wrap; word-break:break-all; margin:10px 0 0; padding:10px;
+        border:2px solid var(--rule); background:#f6f4ef; max-height:220px; overflow:auto; }
+  .fail { color:var(--signal); font-weight:700; }
+</style>
+
+<h1>Vault round trip</h1>
+
+<fieldset>
+  <legend>1. Plaintext</legend>
+  <input id="plain" value="the quick brown fox">
+  <p>Encrypt happens under the deployed encrypt policy, decrypt under the decrypt policy, which
+     requires <code>vault-reader</code>. Both run inside the enclave, so the key is never here.</p>
+  <button id="run">Run round trip</button>
+</fieldset>
+
+<fieldset><legend>2. Log</legend><pre id="log">idle</pre></fieldset>
+
+<script>
+const ENCLAVE_TIMEOUT_MS = 120000;
+const out = document.getElementById("log");
+let lines = [];
+const say = (m) => { lines.push(m); out.textContent = lines.join("\n"); };
+const fail = (m) => { lines.push(m); out.innerHTML = lines.map((l, i) =>
+  i === lines.length - 1 ? '<span class="fail">' + l + "</span>" : l).join("\n"); };
+
+const b64ToBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+const bytesToB64 = (bytes) => {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+};
+
+// The console keeps the doken here after sign-in; this page is same origin, so it can read it.
+const doken = sessionStorage.getItem("tide.console.doken");
+/* A nonce for this enclave window, not an identity.
+ *
+ * The enclave echoes it back every second and closes itself if the answer differs, which is how it
+ * avoids outliving the page that opened it. The reference client generates a fresh random one per
+ * window, so this does the same rather than reusing the console's sign-in id. */
+const sessionId = Array.from(crypto.getRandomValues(new Uint32Array(5)),
+  (v) => v.toString(16).padStart(8, "0")).join("");
+
+async function post(path) {
+  const headers = doken ? { Authorization: "Doken " + doken } : {};
+  const res = await fetch(path, { method: "POST", headers });
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = { error: text }; }
+  if (!res.ok) throw new Error((body && body.error) || res.status + " " + res.statusText);
+  return body;
+}
+
+async function api(path) {
+  const headers = doken ? { Authorization: "Doken " + doken } : {};
+  const res = await fetch(path, { headers });
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch { body = { error: text }; }
+  if (!res.ok) throw new Error((body && body.error) || res.status + " " + res.statusText);
+  return body;
+}
+
+/* One enclave window, driven through both flows.
+ *
+ * Kept open across encrypt and decrypt on purpose: the session key lives in that window and never
+ * leaves it, so reopening would mean a second sign-in and a doken bound to a different key. */
+async function inEnclave(steps) {
+  const cfg = await api("/tide/enclave/config");
+  const { clientOriginAuth } = await api(
+    "/tide/enclave/origin-signature?origin=" + encodeURIComponent(window.location.origin));
+  const { voucherUrl } = await post("/console/session/voucher-url");
+
+  const url = new URL(cfg.homeOrkUrl);
+  url.searchParams.set("type", "request");
+  url.searchParams.set("vendorId", cfg.vvkId);
+  url.searchParams.set("origin", encodeURIComponent(window.location.origin));
+  url.searchParams.set("originsig", encodeURIComponent(clientOriginAuth));
+  // Without this the enclave throws before it announces itself, so the window just never answers.
+  url.searchParams.set("voucherURL", encodeURIComponent(voucherUrl));
+
+  /* A popup, not a hidden iframe.
+   *
+   * The reference client tries the frame first and falls back to this, and the reason shows up
+   * here: from inside a frame the enclave is a subresource of a public origin reaching localhost,
+   * and the browser refuses its voucher fetch outright. A popup is a top level context, the same
+   * shape as the sign-in redirect that already works. */
+  url.searchParams.set("hidden", "false");
+
+  const enclaveOrigin = new URL(cfg.homeOrkUrl).origin;
+  const popup = window.open(url.toString(), "tide-vault", "width=520,height=760");
+  if (!popup) throw new Error("The enclave window was blocked. Allow popups for this page.");
+
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const waiters = new Map();
+
+    const finish = (fn, arg) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      try { popup.close(); } catch { /* already gone */ }
+      fn(arg);
+    };
+    const timer = setTimeout(
+      () => finish(reject, new Error(
+        "The enclave did not answer in time. If nothing is logged above from the enclave, it failed "
+        + "during its own startup; check that window's console.")), ENCLAVE_TIMEOUT_MS);
+
+    // Send one request and wait for the reply the enclave names for it.
+    const ask = (message, replyType) => new Promise((res, rej) => {
+      waiters.set(replyType, { res, rej });
+      popup.postMessage({ type: "request", message }, enclaveOrigin);
+    });
+
+    async function onMessage(ev) {
+      if (ev.origin !== enclaveOrigin) return;
+      const data = ev.data;
+      if (!data || typeof data.type !== "string") return;
+
+      // Everything the enclave says, verbatim. It reports its own startup failures this way, and
+      // without this they are invisible: the window dies quietly and the wait ends in a timeout
+      // that says nothing about why.
+      if (data.type !== "session check") {
+        const detail = typeof data.message === "string"
+          ? data.message
+          : (data.message && data.message.error) ? data.message.error : "";
+        say("enclave <- " + data.type + (detail ? ": " + detail : ""));
+      }
+
+      try {
+        /* A keep-alive, not a question. The popup asks every second who we think is signed in
+         * and closes itself if the answer is not the session it was given, which is how it avoids
+         * outliving the page that opened it. Silence reads as a wrong answer. */
+        if (data.type === "session check") {
+          popup.postMessage({ type: "current session", message: sessionId }, enclaveOrigin);
+          return;
+        }
+
+        if (data.type === "pageLoaded") {
+          popup.postMessage({ type: "init", message: { doken, sessionId } }, enclaveOrigin);
+          return;
+        }
+        if (data.type === "init done") {
+          finish(resolve, await steps(ask, say));
+          return;
+        }
+        const waiter = waiters.get(data.type);
+        if (waiter) {
+          waiters.delete(data.type);
+          const m = data.message;
+          if (m && m.error) waiter.rej(new Error(m.error));
+          else waiter.res(m);
+        }
+      } catch (e) {
+        finish(reject, e);
+      }
+    }
+    window.addEventListener("message", onMessage);
+  });
+}
+
+document.getElementById("run").addEventListener("click", async (ev) => {
+  ev.target.disabled = true;
+  lines = [];
+  try {
+    if (!doken) {
+      throw new Error("Sign in on /console first, in this tab: this page reuses that session's "
+        + "doken, and sessionStorage does not cross tabs.");
+    }
+
+    const plain = document.getElementById("plain").value;
+    say("plaintext: " + plain);
+
+    const ep = await api("/vault/encrypt-policy");
+    say("encrypt policy " + ep.policyId.slice(0, 16) + "… over " + ep.modelIds.join(", "));
+    const encryptPolicy = b64ToBytes(ep.policy);
+
+    const dp = await api("/vault/decrypt-policy");
+    say("decrypt policy " + dp.policyId.slice(0, 16) + "… role=" + (dp.params && dp.params.role));
+    const decryptPolicy = b64ToBytes(dp.policy);
+
+    await inEnclave(async (ask, log) => {
+      const data = new TextEncoder().encode(plain);
+
+      log("encrypting…");
+      const enc = await ask(
+        { flow: "policy encrypt", request: [{ data, tags: ["vault"] }], policy: encryptPolicy },
+        "encrypt request completed");
+      const blob = Array.isArray(enc) ? enc[0] : enc;
+      const bytes = blob instanceof Uint8Array ? blob : new Uint8Array(blob);
+      log("ciphertext: " + bytesToB64(bytes).slice(0, 72) + "…");
+
+      log("decrypting…");
+      const dec = await ask(
+        { flow: "policy decrypt", request: [{ encrypted: bytes, tags: ["vault"] }], policy: decryptPolicy },
+        "decrypt request completed");
+      const first = Array.isArray(dec) ? dec[0] : dec;
+      const text = typeof first === "string"
+        ? first
+        : new TextDecoder().decode(first instanceof Uint8Array ? first : new Uint8Array(first));
+      log("plaintext back: " + text);
+      log(text === plain ? "ROUND TRIP OK" : "MISMATCH");
+    });
+  } catch (e) {
+    fail("failed: " + e.message);
+  } finally {
+    ev.target.disabled = false;
+  }
+});
+</script>

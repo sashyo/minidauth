@@ -398,11 +398,29 @@ public final class GovernanceService {
      * the same role can both reach quorum, and the second must not silently double-apply or
      * resurrect a role the first one removed.
      */
+    /**
+     * The policy that may sign role-conferring units, if one is deployed.
+     *
+     * <p>Recognised by needing approvals. Two policies can cover {@code AttestationUnit:1} at once
+     * and that is the point: the IMPLICIT one signs the units every sign-in needs and refuses the
+     * two that confer a role, this one signs only those two and only with approvals. Neither can do
+     * the other's job, so which one a request names is not a choice this service can abuse.
+     */
+    public synchronized java.util.Optional<DeployedPolicy> rolePolicy() {
+        return store.policies().stream()
+                .filter(p -> p.modelIds != null && p.modelIds.contains(UNIT_MODEL))
+                .filter(p -> "EXPLICIT".equals(p.approvalType))
+                .findFirst();
+    }
+
     /** A deployed policy that can authorise attestation unit signing. */
     public synchronized java.util.Optional<DeployedPolicy> unitPolicy() {
         return store.policies().stream()
                 .filter(p -> p.modelIds != null
                         && (p.modelIds.contains(UNIT_MODEL) || p.modelIds.contains(ANY_MODEL)))
+                // Never the role policy: it demands approvals, and these units are signed on every
+                // sign-in, so naming it here would mean no token could be minted without a quorum.
+                .filter(p -> !"EXPLICIT".equals(p.approvalType))
                 .findFirst();
     }
 
@@ -498,6 +516,105 @@ public final class GovernanceService {
         return out;
     }
 
+    /** The role set a change request would leave the identity holding. */
+    private java.util.List<String> resultingRoles(ChangeRequest cr, boolean revoke) {
+        String vuid = (String) cr.payload.get("vuid");
+        String role = (String) cr.payload.get("role");
+        java.util.LinkedHashSet<String> roles = new java.util.LinkedHashSet<>(store.grant(vuid).roles);
+        if (revoke) roles.remove(role); else roles.add(role);
+        return new java.util.ArrayList<>(roles);
+    }
+
+    /** The attestation units that make a role set real for an identity. */
+    private java.util.List<byte[]> roleUnitsFor(String vuid, java.util.Collection<String> roles) {
+        String vvkId = vrk.store().get(org.minidauth.store.VendorKeyStore.VENDOR_ID);
+        if (vvkId == null) {
+            throw new IllegalStateException("No vendor key, so a grant cannot be attested");
+        }
+        java.util.List<byte[]> units = new java.util.ArrayList<>();
+        java.util.List<String> roleIds = new java.util.ArrayList<>();
+        for (String role : roles) {
+            units.add(org.minidauth.tide.AttestationUnits.roleDefinition(role, role, false, vvkId));
+            roleIds.add(role);
+        }
+        units.add(org.minidauth.tide.AttestationUnits.userRoleMappingSet(vuid, roleIds));
+        return units;
+    }
+
+    /**
+     * Build the carrier a quorum of administrators approves to grant a role.
+     *
+     * <p>The same two phase shape as a policy deployment, for the same reason: this service holds
+     * the vendor key, so if it could sign these alone it could grant itself anything. The units are
+     * stamped with the VRK so the enclave will accept the blob, then each administrator's enclave
+     * appends their own doken, and the accumulated result is what the cohort finally signs.
+     */
+    private String buildRoleUnitCarrier(ChangeRequest cr, boolean revoke, DeployedPolicy authorizer)
+            throws Exception {
+        String vuid = (String) cr.payload.get("vuid");
+        java.util.List<byte[]> units = roleUnitsFor(vuid, resultingRoles(cr, revoke));
+
+        var req = new org.midgard.models.RequestExtensions.AttestationUnitSignRequest(POLICY_AUTH_FLOW);
+        req.SetUnits(units.toArray(new byte[0][]));
+        req.SetPolicy(Base64.getDecoder().decode(authorizer.policyBytes));
+        req.SetCustomExpiry((System.currentTimeMillis() / 1000) + APPROVAL_CARRIER_EXPIRY_SECONDS);
+
+        // Materialise the draft before stamping it: the stamp signs a hash of the draft, and
+        // encoding before it exists leaves the approvers signing nothing.
+        req.GetDraft();
+        vrk.initializeRequestWithVrk(req);
+
+        cr.carrierUnits = new java.util.ArrayList<>();
+        for (byte[] unit : units) {
+            cr.carrierUnits.add(Base64.getEncoder().encodeToString(unit));
+        }
+        return Base64.getEncoder().encodeToString(req.Encode());
+    }
+
+    /**
+     * Sign role units under the policy that requires administrator approvals.
+     *
+     * <p>The first commit attempt only builds the carrier and stops. Refusing to sign until the
+     * threshold is met is the whole mechanism.
+     */
+    private java.util.List<RoleGrant.SignedUnit> attestViaAdminQuorum(ChangeRequest cr,
+                                                                     DeployedPolicy authorizer)
+            throws Exception {
+        if (cr.approvalCarrier == null || cr.approvalCarrier.isBlank()) {
+            throw GovernanceException.conflict(
+                    "This role change must be approved by " + requiredApprovals(authorizer)
+                    + " Tide administrator(s) before it can be committed. Approve it in the "
+                    + "governance console, then commit again.");
+        }
+        int required = requiredApprovals(authorizer);
+        if (cr.carrierApprovals < required) {
+            throw GovernanceException.conflict("Waiting on Tide administrator approvals: "
+                    + cr.carrierApprovals + " of " + required + " collected.");
+        }
+        if (cr.carrierUnits == null || cr.carrierUnits.isEmpty()) {
+            throw new IllegalStateException("The approved carrier has no units recorded against it");
+        }
+
+        // Submitted exactly as the approvers left it: its bytes are what their dokens signed over.
+        var req = org.midgard.models.ModelRequest.FromBytes(
+                Base64.getDecoder().decode(cr.approvalCarrier));
+        var settings = vrk.store().midgardSettings();
+        settings.TraceParent = org.minidauth.vrk.Trace.current();
+        SignatureResponse resp = org.midgard.Midgard.SignModel(settings, req);
+
+        if (resp.Signatures == null || resp.Signatures.length < cr.carrierUnits.size()) {
+            throw new IllegalStateException("The Tide network returned "
+                    + (resp.Signatures == null ? 0 : resp.Signatures.length)
+                    + " signatures for " + cr.carrierUnits.size() + " attestation units");
+        }
+
+        java.util.List<RoleGrant.SignedUnit> out = new java.util.ArrayList<>();
+        for (int i = 0; i < cr.carrierUnits.size(); i++) {
+            out.add(new RoleGrant.SignedUnit(cr.carrierUnits.get(i), resp.Signatures[i]));
+        }
+        return out;
+    }
+
     private String commitRoleChange(ChangeRequest cr, boolean revoke) {
         String vuid = (String) cr.payload.get("vuid");
         String role = (String) cr.payload.get("role");
@@ -513,21 +630,38 @@ public final class GovernanceService {
                     + "; another change request already granted it");
         }
 
+        /* Work out the new role set without touching the stored one.
+         *
+         * The store hands back the live grant, so mutating it here and attesting afterwards would
+         * leave the role in memory when the cohort refuses, and any later write would persist a
+         * grant that nothing has attested. The record must only move once the signatures exist. */
+        java.util.LinkedHashSet<String> target = new java.util.LinkedHashSet<>(grant.roles);
         if (revoke) {
-            grant.roles.remove(role);
+            target.remove(role);
         } else {
-            grant.roles.add(role);
+            target.add(role);
         }
+
         // Attest the new role set before recording it. If the cohort will not sign, the change does
         // not happen: a grant this service could write but not prove would be exactly the kind of
         // locally-asserted authority the design exists to remove.
+        java.util.Optional<DeployedPolicy> approvals = rolePolicy();
+        java.util.List<RoleGrant.SignedUnit> signed;
         try {
-            grant.signedUnits = roleAttestor.attest(vuid, grant.roles);
+            signed = approvals.isPresent()
+                    ? attestViaAdminQuorum(cr, approvals.get())
+                    : roleAttestor.attest(vuid, target);
+        } catch (GovernanceException e) {
+            throw e;
         } catch (Exception e) {
             throw new GovernanceException(502,
                     "The Tide network would not attest this role change, so it was not applied: "
                             + e.getMessage());
         }
+
+        grant.roles.clear();
+        grant.roles.addAll(target);
+        grant.signedUnits = signed;
 
         grant.changeRequestId = cr.id;
         grant.updatedAt = Instant.now().toString();
@@ -559,16 +693,27 @@ public final class GovernanceService {
      */
     public synchronized String carrierFor(String changeRequestId) throws Exception {
         ChangeRequest cr = require(changeRequestId);
-        if (cr.kind != Kind.DEPLOY_POLICY) {
-            throw GovernanceException.badRequest("Only a policy deployment is approved this way");
+        boolean roleChange = cr.kind == Kind.GRANT_ROLE || cr.kind == Kind.REVOKE_ROLE;
+        if (cr.kind != Kind.DEPLOY_POLICY && !roleChange) {
+            throw GovernanceException.badRequest(
+                    "Only a policy deployment or a role change is approved this way");
         }
 
         if (cr.approvalCarrier == null || cr.approvalCarrier.isBlank()) {
-            DeployedPolicy authorizer = adminPolicy().orElseThrow(() -> GovernanceException.conflict(
-                    "No admin policy is deployed, so there is nothing to approve against"));
-            cr.approvalCarrier = buildApprovalCarrier(buildPolicy(cr.payload), cr.payload, authorizer);
+            if (roleChange) {
+                DeployedPolicy authorizer = rolePolicy().orElseThrow(() ->
+                        GovernanceException.conflict("No policy requiring approvals is deployed for "
+                                + "role changes, so there is nothing to approve against"));
+                cr.approvalCarrier = buildRoleUnitCarrier(cr, cr.kind == Kind.REVOKE_ROLE, authorizer);
+            } else {
+                DeployedPolicy authorizer = adminPolicy().orElseThrow(() ->
+                        GovernanceException.conflict(
+                                "No admin policy is deployed, so there is nothing to approve against"));
+                cr.approvalCarrier = buildApprovalCarrier(buildPolicy(cr.payload), cr.payload, authorizer);
+            }
             cr.carrierApprovals = 0;
             store.putChangeRequest(cr);
+            store.persist();
         }
         return cr.approvalCarrier;
     }
@@ -622,6 +767,7 @@ public final class GovernanceService {
 
     /** The only model an openly served policy may authorize. */
     public static final String ENCRYPT_MODEL = "PolicyEnabledEncryption:1";
+    public static final String DECRYPT_MODEL = "PolicyEnabledDecryption:1";
 
     /**
      * A deployed policy that is safe to hand to anyone.
@@ -631,6 +777,15 @@ public final class GovernanceService {
      * let it authorize any request other than the models it names. Widen that list and the same
      * bytes become a key to something else, so the check is exact rather than "contains".
      */
+    /** The deployed decryption policy, if one is deployed. */
+    public synchronized java.util.Optional<DeployedPolicy> publicDecryptPolicy() {
+        return store.policies().stream()
+                .filter(p -> p.modelIds != null
+                        && p.modelIds.size() == 1
+                        && DECRYPT_MODEL.equals(p.modelIds.get(0)))
+                .findFirst();
+    }
+
     public synchronized java.util.Optional<DeployedPolicy> publicEncryptPolicy() {
         return store.policies().stream()
                 .filter(p -> p.modelIds != null
@@ -716,6 +871,46 @@ public final class GovernanceService {
      * @return the id of the deployed policy
      * @throws GovernanceException.Conflict while approvals are still outstanding
      */
+    /**
+     * Deploy a policy under an authorizer that asks nobody.
+     *
+     * <p>This is the bootstrap policy's route, and it exists because the bootstrap has to be
+     * IMPLICIT. Attestation units are signed under the same policy on every sign-in, and a policy
+     * that demanded approvals for those would mean no token could ever be minted, including the
+     * admin tokens whose approvals it was waiting for.
+     *
+     * <p>The cost is real and worth stating: while this is the authorizer, deploying a policy needs
+     * only the vendor key. The bootstrap contract narrows what that is worth by refusing to sign
+     * the units that confer a role, so the way out of it is to deploy an EXPLICIT policy and let
+     * the quorum route above take over.
+     */
+    private String commitPolicyUnderImplicitAuthorizer(ChangeRequest cr, Policy policy,
+                                                       Map<String, Object> spec,
+                                                       DeployedPolicy authorizer) throws Exception {
+        PolicySignRequest req = new PolicySignRequest(policy.ToBytes(), POLICY_AUTH_FLOW);
+
+        if (Boolean.TRUE.equals(spec.get("uploadContract"))) {
+            String contractIdRef = (String) spec.get("contractId");
+            Contract c = store.contract(contractIdRef).orElseThrow(() ->
+                    GovernanceException.badRequest("uploadContract was requested but contract "
+                            + contractIdRef + " is not registered"));
+            String entryType = str(spec, "entryType");
+            req.AddContractToUpload(PolicySignRequest.ContractType.forseti,
+                    contractUploadPayload(c.source, entryType == null ? DEFAULT_ENTRY_TYPE : entryType));
+        }
+
+        req.SetCustomExpiry((System.currentTimeMillis() / 1000) + POLICY_SIGN_EXPIRY_SECONDS);
+        req.SetPolicy(Base64.getDecoder().decode(authorizer.policyBytes));
+
+        var settings = vrk.store().midgardSettings();
+        settings.TraceParent = org.minidauth.vrk.Trace.current();
+        SignatureResponse resp = org.midgard.Midgard.SignModel(settings, req);
+        if (resp.Signatures == null || resp.Signatures.length == 0 || resp.Signatures[0] == null) {
+            throw new IllegalStateException("Tide network returned no signature for the policy sign");
+        }
+        return storeSignedPolicy(cr, policy, spec, resp.Signatures[0]);
+    }
+
     private String commitPolicyViaAdminQuorum(ChangeRequest cr, Policy policy,
                                               Map<String, Object> spec,
                                               DeployedPolicy authorizer) throws Exception {
@@ -760,6 +955,27 @@ public final class GovernanceService {
         return 1;
     }
 
+    /**
+     * Refuse the first policy until somebody holds {@code governance-admin}.
+     *
+     * <p>Signing it spends the VRK's authorizer pack, and the pack is the only thing that can
+     * attest a role while no policy exists. Deploying first therefore leaves a key on which no role
+     * can ever be granted: the pack is gone, and any policy careful enough to be worth deploying
+     * refuses to sign the units that confer one. There is no way back from it, which is why this
+     * refuses rather than warns.
+     */
+    private void requireAnAdminExistsBeforeSpendingThePack() {
+        boolean anyAdmin = store.grants().stream()
+                .anyMatch(g -> g.roles != null && g.roles.contains(org.minidauth.auth.DokenOperators.ROLE_ADMIN));
+        if (!anyAdmin) {
+            throw GovernanceException.conflict(
+                    "Grant " + org.minidauth.auth.DokenOperators.ROLE_ADMIN + " to at least one Tide "
+                    + "identity before deploying the first policy. Signing it revokes the authorizer "
+                    + "pack, which is the only thing that can attest a role until a policy exists, so "
+                    + "deploying first leaves a key on which no role can ever be granted.");
+        }
+    }
+
     private String commitPolicy(ChangeRequest cr) throws Exception {
         Map<String, Object> spec = cr.payload;
         Policy policy = buildPolicy(spec);
@@ -770,10 +986,17 @@ public final class GovernanceService {
         // policy has to be approved by a quorum of admins through it.
         java.util.Optional<DeployedPolicy> authorizer = adminPolicy();
         if (authorizer.isPresent()) {
+            // Which of the two policy routes applies is decided by the authorizer, not by this
+            // service. An IMPLICIT policy is one the ORKs never ask approvers about, so building a
+            // carrier and waiting for dokens against one would wait forever.
+            if ("IMPLICIT".equals(authorizer.get().approvalType)) {
+                return commitPolicyUnderImplicitAuthorizer(cr, policy, spec, authorizer.get());
+            }
             return commitPolicyViaAdminQuorum(cr, policy, spec, authorizer.get());
         }
 
         requireFirstAdminPackMatchesActiveVrk();
+        requireAnAdminExistsBeforeSpendingThePack();
 
         PolicySignRequest req = new PolicySignRequest(policy.ToBytes(), VRK_AUTH_FLOW);
 
@@ -890,6 +1113,50 @@ public final class GovernanceService {
 
     /** Build (and thereby validate) the policy a spec describes. No network, no side effects. */
     @SuppressWarnings("unchecked")
+    /* Which policy wire version to emit.
+     *
+     * The bindings build version 4, which the released ORK network does not know: it answers a 500
+     * whose body says "Could not find specified policy version: 4", and Midgard discards that body,
+     * so it surfaces as an unexplained failure to sign Policy:1. Set MC_POLICY_VERSION=3 to talk to
+     * a network that has not caught up yet.
+     *
+     * Version 3 is version 4 without the optional expiry field, so with no expiry set the two are
+     * byte for byte identical apart from the version character itself. That is why this can rewrite
+     * one into the other rather than needing a second serializer. */
+    private static final String POLICY_VERSION = System.getenv("MC_POLICY_VERSION");
+
+    /** Where the one character version sits: outer header and length, inner header, field length. */
+    private static final int VERSION_OFFSET = 16;
+
+    /**
+     * Re-emit a policy at the configured wire version.
+     *
+     * <p>Refuses rather than guesses if the bytes are not shaped as expected, because a policy is
+     * signed once and a malformed one is not something to discover later.
+     */
+    private static Policy atConfiguredVersion(Policy policy) {
+        if (POLICY_VERSION == null || POLICY_VERSION.isBlank() || "4".equals(POLICY_VERSION)) {
+            return policy;
+        }
+        if (!"3".equals(POLICY_VERSION)) {
+            throw GovernanceException.badRequest("MC_POLICY_VERSION must be 3 or 4, got " + POLICY_VERSION);
+        }
+        if (policy.getExpiry() != null) {
+            throw GovernanceException.badRequest(
+                    "A version 3 policy has no expiry field, so this policy cannot be expressed on "
+                    + "this network. Drop the expiry or use a network that understands version 4.");
+        }
+
+        byte[] bytes = policy.ToBytes();
+        if (bytes.length <= VERSION_OFFSET || bytes[VERSION_OFFSET] != (byte) '4') {
+            throw new IllegalStateException(
+                    "Expected the policy version at offset " + VERSION_OFFSET + "; the serialized "
+                    + "layout has changed and this downgrade is no longer safe");
+        }
+        bytes[VERSION_OFFSET] = (byte) '3';
+        return Policy.From(bytes);
+    }
+
     private Policy buildPolicy(Map<String, Object> spec) {
         String contractId = str(spec, "contractId");
         if (contractId == null) throw GovernanceException.badRequest("contractId is required");
@@ -946,7 +1213,8 @@ public final class GovernanceService {
             throw GovernanceException.badRequest("expiry must be a number (epoch seconds)");
         }
 
-        return new Policy(contractId, modelIds, keyId, approvalType, executionType, params, expiry);
+        return atConfiguredVersion(
+                new Policy(contractId, modelIds, keyId, approvalType, executionType, params, expiry));
     }
 
     /**

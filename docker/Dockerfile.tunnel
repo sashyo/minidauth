@@ -1,0 +1,20 @@
+# A cloudflared quick tunnel that writes the address it was given to a file.
+#
+# Its own image has no shell, and the address only exists in its output, so this wraps it in one
+# that can read that output and leave the URL somewhere the service can pick up.
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates wget \
+ && arch="$(uname -m)" \
+ && case "$arch" in \
+      x86_64)  file=cloudflared-linux-amd64 ;; \
+      aarch64) file=cloudflared-linux-arm64 ;; \
+      *) echo "No cloudflared build for $arch" >&2; exit 1 ;; \
+    esac \
+ && wget -qO /usr/local/bin/cloudflared \
+      "https://github.com/cloudflare/cloudflared/releases/latest/download/$file" \
+ && chmod +x /usr/local/bin/cloudflared
+
+COPY docker/tunnel.sh /usr/local/bin/tunnel.sh
+RUN chmod +x /usr/local/bin/tunnel.sh
+ENTRYPOINT ["/usr/local/bin/tunnel.sh"]

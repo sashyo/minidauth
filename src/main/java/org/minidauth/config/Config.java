@@ -36,6 +36,26 @@ public final class Config {
     public final boolean requireTideApproval;
     /** Where the enclave fetches vouchers. Must be reachable from the user's browser. */
     public final String voucherUrl;
+
+    /**
+     * Where a browser reaches this service's voucher endpoint, when that is not {@link #publicUrl}.
+     *
+     * <p>The enclave runs on the ORK's public origin and fetches vouchers from here, and a browser
+     * refuses a public page's request to a loopback address ("Permission was denied for this request
+     * to access the loopback address space"). A deployed service on a public URL never sees this;
+     * running on localhost does, and this is the way out without putting the whole service on the
+     * internet.
+     */
+    public final String voucherPublicUrl;
+
+    /**
+     * A file to read {@link #voucherPublicUrl} from, when it is not known at startup.
+     *
+     * <p>A tunnel does not have an address until it has connected, which is after this service is
+     * already running. Reading it per request rather than at boot means neither has to wait for the
+     * other, and an absent file simply means no tunnel.
+     */
+    public final String voucherPublicUrlFile;
     /**
      * This service's externally reachable base URL.
      *
@@ -50,7 +70,8 @@ public final class Config {
     private Config(int port, Path dataDir, String homeOrkUrl, String payerPublic,
                    int thresholdT, int thresholdN, String adminToken, String adminName,
                    Path operatorsFile, String[] vrkModels, int graceDays,
-                   boolean requireTideApproval, String voucherUrl, String publicUrl) {
+                   boolean requireTideApproval, String voucherUrl, String publicUrl,
+                   String voucherPublicUrl, String voucherPublicUrlFile) {
         this.port = port;
         this.dataDir = dataDir;
         this.homeOrkUrl = homeOrkUrl;
@@ -65,6 +86,8 @@ public final class Config {
         this.requireTideApproval = requireTideApproval;
         this.voucherUrl = voucherUrl;
         this.publicUrl = publicUrl;
+        this.voucherPublicUrl = voucherPublicUrl;
+        this.voucherPublicUrlFile = voucherPublicUrlFile;
     }
 
     public static Config fromEnv() {
@@ -83,7 +106,9 @@ public final class Config {
                 intOrDefault("MC_GRACE_DAYS", 7),
                 Boolean.parseBoolean(str("MC_REQUIRE_TIDE_APPROVAL", "false")),
                 str("MC_VOUCHER_URL", null),
-                str("MC_PUBLIC_URL", null));
+                str("MC_PUBLIC_URL", null),
+                str("MC_VOUCHER_PUBLIC_URL", null),
+                str("MC_VOUCHER_PUBLIC_URL_FILE", null));
     }
 
     /**

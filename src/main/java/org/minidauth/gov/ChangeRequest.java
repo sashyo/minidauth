@@ -49,6 +49,15 @@ public final class ChangeRequest {
      */
     public String approvalCarrier;
 
+    /**
+     * The exact attestation units the carrier was built over, base64.
+     *
+     * <p>Kept rather than recomputed. The cohort signs these bytes, and the signatures are stored
+     * against them, so rebuilding them at commit time from state that may have moved on would pair
+     * a signature with a unit it does not cover.
+     */
+    public java.util.List<String> carrierUnits;
+
     /** How many admin dokens the carrier currently holds. */
     public int carrierApprovals;
 

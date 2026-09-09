@@ -1,0 +1,48 @@
+# minidauth, and optionally a public address for the one endpoint that needs one.
+#
+#   docker compose up                    the service, on http://localhost:8081
+#   docker compose --profile public up   the same, plus a published voucher endpoint
+#
+# The second is needed on a laptop. Sign-in happens in the ORK's enclave, on a public origin, and
+# that page has to fetch a voucher back from this service; browsers refuse a public page's request
+# to a loopback address. The tunnel gives that one endpoint an address the browser will accept, and
+# the service serves nothing else on it.
+
+services:
+  minidauth:
+    build:
+      context: .
+    ports:
+      - "8081:8081"
+    environment:
+      # Where a browser reaches the console. Change this and the signed redirect URI follows.
+      MC_PUBLIC_URL: "${MC_PUBLIC_URL:-http://localhost:8081}"
+      # Bootstrap only: creating the vendor key and signing the first enclave settings. After the
+      # first admin is granted, sign-ins replace it. Set your own and stop using it.
+      MC_ADMIN_TOKEN: "${MC_ADMIN_TOKEN:-change-me}"
+      # Written by the tunnel when there is one, absent when there is not.
+      MC_VOUCHER_PUBLIC_URL_FILE: /tunnel/url
+      # The released ORK network speaks policy version 3; the bindings build 4.
+      MC_POLICY_VERSION: "${MC_POLICY_VERSION:-3}"
+    volumes:
+      # The vendor key lives here. Losing it loses the key.
+      - minidauth-data:/data
+      - tunnel:/tunnel:ro
+    restart: unless-stopped
+
+  tunnel:
+    profiles: ["public"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tunnel
+    environment:
+      TUNNEL_TARGET: http://minidauth:8081
+    volumes:
+      - tunnel:/tunnel
+    depends_on:
+      - minidauth
+    restart: unless-stopped
+
+volumes:
+  minidauth-data:
+  tunnel:

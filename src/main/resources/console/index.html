@@ -347,23 +347,52 @@ async function loadKeyState() {
   }
 }
 
+/* Two tallies, deliberately shown apart.
+ *
+ * Operators are counted by this service, so they gate nothing an attacker who owns the machine
+ * cannot pass. Administrators are counted by the ORKs, from dokens signed in their own enclaves,
+ * and for a role change or a policy that is the one that decides. Showing a single "approvals"
+ * number hid that difference, and read 0 regardless because it was reading a field that does not
+ * exist. */
+function needsAdminApproval(cr) {
+  return ["DEPLOY_POLICY", "GRANT_ROLE", "REVOKE_ROLE"].includes(cr.kind);
+}
+
 function renderChangeRequests(list) {
   if (!list.length) return '<p class="muted">Nothing pending.</p>';
-  return `<table><thead><tr>
-      <th>Kind</th><th>Requested by</th><th>Approvals</th><th>Status</th><th></th>
-    </tr></thead><tbody>` +
-    list.map((cr) => `<tr>
+
+  const pending = list.filter((cr) => cr.status === "PENDING");
+  const done = list.filter((cr) => cr.status !== "PENDING");
+
+  const row = (cr) => {
+    const operators = `${cr.authorizationCount ?? 0} of ${esc(cr.threshold ?? "?")}`;
+    const admins = needsAdminApproval(cr) ? String(cr.carrierApprovals ?? 0) : "n/a";
+    const open = cr.status === "PENDING";
+    return `<tr>
       <td>${esc(cr.kind)}</td>
       <td class="mono">${esc(cr.requestedBy)}</td>
-      <td>${(cr.approvals || []).length} of ${esc(cr.threshold ?? "?")}</td>
+      <td>${operators}</td>
+      <td>${esc(admins)}</td>
       <td>${esc(cr.status)}</td>
       <td class="row">
-        <button data-approve="${esc(cr.id)}">Approve</button>
-        ${cr.kind === "DEPLOY_POLICY"
+        ${open ? `<button data-approve="${esc(cr.id)}">Approve</button>` : ""}
+        ${open && needsAdminApproval(cr)
           ? `<button data-sign="${esc(cr.id)}">Sign in enclave</button>` : ""}
-        <button data-commit="${esc(cr.id)}">Commit</button>
+        ${open ? `<button data-commit="${esc(cr.id)}">Commit</button>` : ""}
       </td>
-    </tr>`).join("") + "</tbody></table>";
+    </tr>`;
+  };
+
+  const table = (rows) => `<table><thead><tr>
+      <th>Kind</th><th>Requested by</th><th>Operators</th><th>Admins</th><th>Status</th><th></th>
+    </tr></thead><tbody>${rows.map(row).join("")}</tbody></table>`;
+
+  const parts = [];
+  parts.push(pending.length ? table(pending) : '<p class="muted">Nothing pending.</p>');
+  if (done.length) {
+    parts.push(`<details><summary>${done.length} settled</summary>${table(done)}</details>`);
+  }
+  return parts.join("");
 }
 
 function renderGrants(list) {
@@ -452,6 +481,7 @@ async function approveInEnclave(changeRequestId) {
   const { clientOriginAuth } = await api(
     `/tide/enclave/origin-signature?origin=${encodeURIComponent(window.location.origin)}`
   );
+  const { voucherUrl } = await api("/console/session/voucher-url", { method: "POST" });
 
   const url = new URL(cfg.homeOrkUrl);
   url.searchParams.set("type", "approval");
@@ -459,6 +489,9 @@ async function approveInEnclave(changeRequestId) {
   // Encoded once here; the enclave decodeURIComponent()s both before verifying the signature.
   url.searchParams.set("origin", encodeURIComponent(window.location.origin));
   url.searchParams.set("originsig", encodeURIComponent(clientOriginAuth));
+  // Every enclave flow needs one. Without it the enclave throws in its own startup, before it
+  // announces itself, so the window sits there and the wait ends in a timeout instead of an error.
+  url.searchParams.set("voucherURL", encodeURIComponent(voucherUrl));
 
   const enclaveOrigin = new URL(cfg.homeOrkUrl).origin;
   // Opened synchronously off the operator's click, or the browser blocks it.
@@ -488,8 +521,21 @@ async function approveInEnclave(changeRequestId) {
       if (!data || typeof data.type !== "string") return;
 
       try {
+        // A keep-alive: the popup closes itself if we do not confirm the session every second.
+        if (data.type === "session check") {
+          popup.postMessage({
+            type: "current session",
+            message: sessionStorage.getItem("tide.console.sid"),
+          }, enclaveOrigin);
+          return;
+        }
+
         if (data.type === "pageLoaded") {
-          popup.postMessage({ type: "init", message: { doken: state.doken } }, enclaveOrigin);
+          popup.postMessage({
+            type: "init",
+            // The enclave keys the session key by this; without it the doken will not validate.
+            message: { doken: state.doken, sessionId: sessionStorage.getItem("tide.console.sid") },
+          }, enclaveOrigin);
           return;
         }
 
