@@ -3,6 +3,43 @@
 Cognito owns the login. minidauth supplies an identity the Tide network vouches for and roles a
 quorum decides. The Cognito token never carries a role, and that is the point.
 
+## Run it
+
+You need AWS credentials in the environment and minidauth already running with its policies
+deployed.
+
+```sh
+npm install
+AWS_REGION=eu-west-2 MINIDAUTH_OPS_TOKEN=<your ops token> npm run setup
+npm start                                   # http://localhost:3001
+```
+
+`setup` creates the user pool, the `tide_vuid` custom attribute, an app client with the right OAuth
+flows and callback, and a hosted UI domain. It then registers this app's callback with minidauth,
+merging with whatever is already signed rather than replacing it, and writes everything to `.env`.
+Run it again any time: it reuses what `.env` already names instead of making a second copy.
+
+Then open the page, sign in through the hosted UI, link a Tide identity, and try the protected page.
+It refuses until somebody holds `vault-reader`, which is granted through the quorum in minidauth's
+console at http://localhost:8081/console.
+
+When you are finished:
+
+```sh
+npm run teardown            # deletes the pool and domain it created, and the .env
+```
+
+One thing still needs doing by hand, because it is minidauth's file rather than AWS's. Add an
+operator for the app in minidauth's `operators.json`:
+
+```json
+{ "name": "your-app", "token": "dev-sample-app-token", "roles": ["relying-party"] }
+```
+
+`relying-party` grants nothing on its own. The app can start a Tide sign-in, finish one and read
+grants. It cannot approve a change or touch the vendor key, so leaking that token hands nobody a
+role.
+
 ## The rule this example exists to demonstrate
 
 Cognito can put anything you like in a token, including a Pre Token Generation trigger that adds
@@ -14,70 +51,20 @@ So the token carries identity, `custom:tide_vuid` carries the link, and `/protec
 [server.js](server.js) reads roles from minidauth on every request. Nothing you can change in the
 AWS console will get you into that page.
 
-## What to create in Cognito
-
-1. **A user pool.** Defaults are fine. Note the pool id, like `eu-west-2_ABC123`.
-2. **A custom attribute** on the pool named `tide_vuid`, string, mutable. It appears in tokens and
-   in the API as `custom:tide_vuid`.
-3. **An app client**, with a secret or without, either works. Enable the authorization code grant
-   and the `openid` and `email` scopes. Set the callback URL to `http://localhost:3001/callback`.
-4. **A Cognito domain** for the hosted UI, which gives you
-   `https://<something>.auth.<region>.amazoncognito.com`.
-5. **Credentials for the app** with `cognito-idp:AdminUpdateUserAttributes` on that pool, so the
-   example can write the vuid back. The standard AWS environment variables are picked up.
-
-Then register this app's callback with minidauth, because the enclave will not return to a URI it
-has no signature for:
-
-```sh
-curl -sX POST localhost:8081/tide/enclave/settings -H "Authorization: Bearer $OPS" \
-  -H 'Content-Type: application/json' -d '{
-    "regOn": true, "backupOn": false,
-    "logoUrl": "https://yourapp.example/logo.png",
-    "imageUrl": "https://yourapp.example/bg.png",
-    "redirectUris": ["http://localhost:8081/console", "http://localhost:3001/tide/callback"],
-    "clientOrigins": ["http://localhost:8081", "http://localhost:3001"]
-  }'
-```
-
-And add an operator for the app in minidauth's `operators.json`:
-
-```json
-{ "name": "your-app", "token": "change-me-app", "roles": ["relying-party"] }
-```
-
-`relying-party` grants nothing on its own. The app can start a Tide sign-in, finish one and read
-grants. It cannot approve a change or touch the vendor key.
-
-## Run it
-
-```sh
-npm install
-export COGNITO_REGION=eu-west-2
-export COGNITO_USER_POOL_ID=eu-west-2_ABC123
-export COGNITO_CLIENT_ID=...
-export COGNITO_CLIENT_SECRET=...          # only if the app client has one
-export COGNITO_DOMAIN=https://your-domain.auth.eu-west-2.amazoncognito.com
-export MINIDAUTH_TOKEN=change-me-app
-npm start                                  # http://localhost:3001
-```
-
-Open it, sign in through the hosted UI, link a Tide identity, then try the protected page. It
-refuses until somebody holds `vault-reader`, which is granted through the quorum in minidauth's
-console.
-
-The page tells you which variables are missing rather than failing at the first request, so it is
-worth starting it before you have finished the AWS side.
+## What setup created, if you would rather do it yourself
 
 | | |
 |---|---|
-| `MINIDAUTH_URL` | `http://localhost:8081` |
-| `MINIDAUTH_TOKEN` | the `relying-party` token |
-| `APP_URL` | `http://localhost:3001` |
+| user pool | email sign-in, with a `tide_vuid` string attribute, mutable |
+| app client | authorization code grant, `openid` and `email`, callback `/callback` |
+| hosted domain | `https://minidauth-xxxx.auth.<region>.amazoncognito.com` |
+| minidauth | `/tide/callback` added to the signed redirect URIs, and the origin to the signed origins |
+
+The app also needs `cognito-idp:AdminUpdateUserAttributes` on the pool, to write the vuid back after
+a link. The standard AWS environment variables are picked up.
 
 ## Status
 
-The minidauth half of this is the same code as
-[the Better Auth example](../better-auth), which is exercised against the live network. The Cognito
-half is written from the API and has not been run against a real user pool yet. If you run it and it
-is wrong, that is worth an issue.
+The minidauth half of this is the same code as [the Better Auth example](../better-auth), which is
+exercised against the live network. The Cognito half is written from the API and has not been run
+against a real user pool yet. If you run it and it is wrong, that is worth an issue.

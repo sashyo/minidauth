@@ -2,7 +2,11 @@
   "name": "minidauth-cognito-example",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node server.js" },
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "teardown": "node teardown.js"
+  },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.700.0",
     "cookie-parser": "^1.4.7",
