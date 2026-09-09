@@ -287,7 +287,7 @@ from the grant record on every request rather than from the app's own database.
 | [better-auth](examples/better-auth) | Runs locally, exercised against the live network |
 | [supabase](examples/supabase) | Run end to end, with screenshots of the whole flow |
 | [clerk](examples/clerk) | Run end to end, with screenshots of the whole flow |
-| [auth0](examples/auth0) | Free tier, no card |
+| [auth0](examples/auth0) | Run end to end, with screenshots of the whole flow |
 | [cognito](examples/cognito) | `npm run setup` builds the pool, but AWS wants a card |
 
 Each one is three steps: store the vuid where the user cannot edit it, add a callback route, and

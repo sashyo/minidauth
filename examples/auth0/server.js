@@ -36,6 +36,9 @@ app.get("/", async (req, res) => {
     <p>Auth0 subject <code>${s.sub}</code></p>
     ${identityBlock(s.vuid, roles)}
     ${s.vuid ? "" : '<p><a href="/tide/link">Link a Tide identity</a></p>'}
+    ${s.vuid && s.persisted === false ? `<p class="no">Kept in this session only. Writing it to
+      <code>app_metadata</code> needs this application authorised for the Management API with
+      <code>update:users</code>.</p>` : ""}
     <p><a href="/protected">Open the protected page</a></p>`));
 });
 
@@ -91,7 +94,21 @@ app.get("/tide/callback", async (req, res) => {
   try {
     const { vuid } = await completeLogin(String(data), started.sessionId);
     s.vuid = vuid;
-    await auth0.storeVuid(s.sub, vuid);
+
+    /* Persisting the link is best effort.
+     *
+     * Writing app_metadata needs this application authorised for the Management API with
+     * update:users, which is a separate screen in the Auth0 dashboard and easy to miss. Without it
+     * the demo still works, the link just lives in this session and is gone on restart. Better to
+     * say so than to fail a sign-in over a permission the reader has not granted yet. */
+    try {
+      await auth0.storeVuid(s.sub, vuid);
+      s.persisted = true;
+    } catch (e) {
+      s.persisted = false;
+      s.persistError = e.message;
+      console.log("could not persist the vuid to Auth0:", e.message);
+    }
     res.redirect("/");
   } catch (e) {
     res.status(502).send(page(`<h1>Sign-in could not be verified</h1><p>${e.message}</p>`));

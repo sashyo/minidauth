@@ -14,7 +14,7 @@ The rest are integrations. Same three steps in each, with a different login prov
 | [better-auth](better-auth) | :3000 | Runs locally, exercised against the live network |
 | [supabase](supabase) | :3004 | **Run end to end**, with a [walkthrough](supabase#what-it-looks-like) |
 | [clerk](clerk) | :3003 | **Run end to end**, with a [walkthrough](clerk#what-it-looks-like) |
-| [auth0](auth0) | :3002 | Free tier, no card |
+| [auth0](auth0) | :3002 | **Run end to end**, with a [walkthrough](auth0#what-it-looks-like) |
 | [cognito](cognito) | :3001 | `npm run setup` builds the pool, but AWS wants a card |
 
 ## The pattern, in three steps
