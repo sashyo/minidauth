@@ -311,8 +311,8 @@ to confuse and the difference is expensive.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). minidauth redistributes no third-party code
-([THIRD-PARTY.md](THIRD-PARTY.md)).
+MIT, see [LICENSE](LICENSE). The repository contains no third-party code; the published image
+carries Tide's MidgardJava jar with their permission ([THIRD-PARTY.md](THIRD-PARTY.md)).
 
 The Tide licence the vendor key requires is a separate commercial arrangement with the Tide
 Foundation and has nothing to do with the software licence above.

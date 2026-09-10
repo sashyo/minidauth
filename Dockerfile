@@ -26,6 +26,10 @@ COPY src/ src/
 RUN mvn -q -B package -DskipTests
 
 FROM eclipse-temurin:17-jre
+# Links the published package to the repository, so it shows up there and carries its README.
+LABEL org.opencontainers.image.source="https://github.com/sashyo/minidauth" \
+      org.opencontainers.image.title="minidauth" \
+      org.opencontainers.image.description="Give your existing login a key that nobody holds."
 WORKDIR /app
 
 # Not root: nothing here needs it, and the data directory holds the vendor key.

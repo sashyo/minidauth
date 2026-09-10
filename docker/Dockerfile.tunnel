@@ -3,6 +3,9 @@
 # Its own image has no shell, and the address only exists in its output, so this wraps it in one
 # that can read that output and leave the URL somewhere the service can pick up.
 FROM alpine:3.20
+LABEL org.opencontainers.image.source="https://github.com/sashyo/minidauth" \
+      org.opencontainers.image.title="minidauth-tunnel" \
+      org.opencontainers.image.description="Gives minidauth's voucher endpoint a public address."
 
 RUN apk add --no-cache ca-certificates wget \
  && arch="$(uname -m)" \
