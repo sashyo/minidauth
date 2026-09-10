@@ -224,27 +224,25 @@ to confuse and the difference is expensive.
 ## Distributing an image
 
 The quickest way to let somebody try minidauth is a published image: no Java, no Maven, no hunting
-for a jar. `docker/publish.sh` builds and tags one. **Do not push it yet.**
+for a jar. `docker/publish.sh` builds and tags two, the service and the tunnel, and `PUSH=1` sends
+them to `ghcr.io/sashyo`.
 
-The image contains `MidgardJava`, and that jar:
+The service image contains `MidgardJava`, compiled and unmodified. Tide permits that. What it does
+not permit is Midgard's source, and none is in the image or in this repository: the jar sits in
+`vendor/`, which git ignores, and only the built image leaves the machine that built it.
+
+The jar is still awkward in other ways, and they are worth knowing before you build from source:
 
 | | |
 |---|---|
-| carries no licence | no LICENSE, no NOTICE, nothing in the manifest, so all rights reserved |
+| carries no licence file | the permission to ship it comes from Tide, not from the jar |
 | has no public source | `tide-foundation/Midgard` is a private repository |
-| is not on Maven Central | there is no coordinate to depend on |
-| contains only `linux-x86-64` | no macOS, no Windows, no arm64 |
+| is not on Maven Central | there is no coordinate to depend on, so get it from Tide |
+| contains only `linux-x86-64` | no macOS, no Windows, no arm64; the image is amd64 and Apple Silicon runs it under emulation |
 
-Pushing that image to a registry redistributes Tide's code as surely as committing the jar would.
-Ask them first. The ask is narrow, and worth separating into three:
-
-1. **May we ship the jar inside a container image?** The smallest yes, and it unblocks every user.
-2. **Could the jar carry a licence?** Right now its terms cannot be known by anybody who receives it.
-3. **Could it go to Maven Central?** Then the dependency stops being a topic at all.
-
-The contrast is worth putting in front of them: `tide-js` is a public repository under the Tide
-Community Open Code License, and `@tideorg/js` and `heimdall-tide` are on npm. The browser half of
-Tide is open and installable. The Java half is not, and this service is Java.
+The contrast is worth noting: `tide-js` is a public repository under the Tide Community Open Code
+License, and `@tideorg/js` and `heimdall-tide` are on npm. The browser half of Tide is open and
+installable. The Java half is not, and this service is Java.
 
 The same dependency is why there is no CI here. The code imports `org.midgard`, so a build without
 the jar does not compile, and a public runner has no way to get it.

@@ -64,12 +64,12 @@ signature anyway. Approving a release, authorising a refund, issuing a credentia
 ## Quick start
 
 ```sh
-cp /path/to/MidgardJava-1.0-SNAPSHOT.jar vendor/   # not on Maven Central, see below
+curl -O https://raw.githubusercontent.com/sashyo/minidauth/main/docker-compose.yml
 MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up
 ```
 
-That is the whole install. The image builds the service and runs it on :8081, and the `public`
-profile publishes one endpoint, explained next.
+That pulls the image and runs it on :8081. No Java, no Maven, nothing to build. The image is
+`linux/amd64`; on Apple Silicon Docker runs it under emulation.
 
 **Why `--profile public`.** Sign-in happens inside the Tide enclave, a page served from the ORK's
 own origin, and that page has to fetch a voucher back from this service. Browsers refuse a request
@@ -79,27 +79,26 @@ endpoint answers on it; the console, the ops routes and the governance API retur
 on the host the request arrived on. Drop the profile if this service already has a public URL, and
 set `MC_VOUCHER_PUBLIC_URL` to it instead.
 
-**You need the MidgardJava jar, and it is not public.** Its source lives in a private Tide
-repository, it is not on Maven Central, and the jar itself carries no licence, so this project cannot
-redistribute it or ship it inside an image. Ask the [Tide Foundation](https://tide.org) for it and
-put it in `vendor/`. The native library rides inside the jar, and it is built for `linux-x86-64`
-only, so Docker is the sane route on anything else.
+Then [bring up a vendor key](docs/running.md#bringing-up-a-vendor-key), and open the
+[notes demo](examples/notes) to watch it work.
 
-That is a real barrier and it is nobody's oversight but the reason to say so plainly: without that
-jar the build does not compile, which is also why this repository has no CI.
-[docs/running.md](docs/running.md#distributing-an-image) has what would need to change.
+### Building from source
 
-Without Docker, and with a JDK 17+ and Maven:
+The image carries Tide's `MidgardJava` jar, which Tide permits in a published image. Its source is
+not public and is never part of this repository, so building yourself means getting the jar from the
+[Tide Foundation](https://tide.org) and putting it in `vendor/`, which git ignores:
 
 ```sh
-export MC_ADMIN_TOKEN=$(openssl rand -hex 32)   # bootstrap only, see below
-export MC_PUBLIC_URL=http://localhost:8081      # how a browser reaches this service
-mvn -q package -DskipTests && ./run.sh          # :8081
+docker compose build                              # or, with a JDK 17+ and Maven:
+mvn -q package -DskipTests && ./run.sh            # :8081
 ```
 
+The jar's native library is built for `linux-x86-64` only, and the code imports it, which is also why
+there is no CI here: a public runner cannot compile it.
+
 Operator credentials live in `operators.json`, and an entry authenticates by token, token digest or
-public key. [Running minidauth](docs/running.md) covers that, along with creating the vendor key,
-the order the first policies must be deployed in, and the mistakes that strand a key permanently.
+public key. [Running minidauth](docs/running.md) covers that, along with the order the first policies
+must be deployed in and the mistakes that strand a key permanently.
 
 ## Who this is for
 

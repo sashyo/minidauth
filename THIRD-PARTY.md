@@ -1,20 +1,26 @@
 # Third-party code
 
-minidauth redistributes no third-party code. This file records what it links against and why, so
-the answer to "what is in the box" stays checkable rather than remembered.
+This repository contains no third-party code. The published container image does contain some, and
+this file records what and why, so the answer to "what is in the box" stays checkable rather than
+remembered.
 
-## Linked, not redistributed
+## MidgardJava
 
-### MidgardJava
+- Copyright Tide Foundation Ltd. Wraps `libMidgardCore.so`, linux-x86-64 only.
+- **In the repository:** never. Not the jar, not the source. Building from source needs the jar in
+  `vendor/`, which git ignores; get it from Tide.
+- **In the image:** the compiled jar, unmodified, shipped with Tide's permission. Midgard's source
+  is private and is not included.
 
-- A Maven dependency (`org.tide:MidgardJava`), not vendored into this repository.
-- Copyright Tide Foundation Ltd.
-- Wraps `libMidgardCore.so`. Required at runtime; obtained separately.
-
-### Runtime dependencies
+## Runtime dependencies
 
 Declared in `pom.xml` and resolved by Maven: Jackson, JNA, Byte Buddy, Micrometer. Each carries its
-own license, typically Apache-2.0. None is vendored here.
+own license, typically Apache-2.0. None is vendored here; the image carries their jars as released.
+
+## The tunnel image
+
+Alpine plus Cloudflare's `cloudflared` binary, downloaded from its GitHub releases at build time
+and unmodified. Apache-2.0.
 
 ## Not included
 

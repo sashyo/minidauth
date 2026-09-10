@@ -10,11 +10,10 @@
 
 services:
   minidauth:
-    # Published images are not available yet: the image contains Tide's MidgardJava, which carries
-    # no licence, so it cannot be redistributed without their permission. Until then this builds
-    # locally from the jar you supply in vendor/.
-    #
-    #   image: ghcr.io/sashyo/minidauth:latest
+    # Pulled, so there is nothing to build and no jar to find. `docker compose build` still works
+    # from source if you have MidgardJava in vendor/.
+    image: ghcr.io/sashyo/minidauth:${MINIDAUTH_VERSION:-latest}
+    pull_policy: missing
     build:
       context: .
     platform: linux/amd64
@@ -38,6 +37,9 @@ services:
 
   tunnel:
     profiles: ["public"]
+    # Published too, so this file works on its own without the rest of the repository.
+    image: ghcr.io/sashyo/minidauth-tunnel:${MINIDAUTH_VERSION:-latest}
+    pull_policy: missing
     build:
       context: .
       dockerfile: docker/Dockerfile.tunnel
