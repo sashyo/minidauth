@@ -277,9 +277,9 @@
   <section>
     <h2>Grant or revoke a role</h2>
     <div class="body">
-      <p class="muted">Filing is only a request. Nothing changes until it is approved, signed by an
-        administrator in their own enclave, and committed, all in the panel above. Click an identity
-        under role grants to fill it in.</p>
+      <p class="muted">Filing is only a request. Nothing changes until other operators approve it, an
+        administrator signs it in their own enclave, and it is committed, all in the panel above.
+        Whoever files a request cannot approve it. Click an identity under role grants to fill it in.</p>
       <form id="roleForm" class="row">
         <input id="roleVuid" class="grow mono" placeholder="vuid" required autocomplete="off">
         <input id="roleName" list="knownRoles" placeholder="role" required style="width:190px">
@@ -684,7 +684,8 @@ $("roleForm").addEventListener("submit", async (ev) => {
       body: JSON.stringify({ vuid: $("roleVuid").value.trim(), role: $("roleName").value.trim(), revoke }),
     });
     out.className = "good";
-    out.textContent = "Filed. Now Approve, Sign in enclave, then Commit it under change requests.";
+    out.textContent = "Filed. You cannot approve your own request: two other operators approve it, " +
+      "then an administrator uses Sign in enclave and Commit under change requests.";
     $("roleForm").reset();
     await refresh();
   } catch (e) {

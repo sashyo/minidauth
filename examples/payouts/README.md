@@ -126,8 +126,8 @@ curl -X POST http://localhost:8081/iga/change-requests/role \
 ```
 
 Or use the form in the [minidauth console](http://localhost:8081/console), which does the same thing.
-Then, under change requests: **Approve** until the operator count is met, **Sign in enclave** as an
-administrator, which is the approval the network counts, and **Commit**.
+Whoever files a request cannot approve it. Two other operators **Approve** it, an administrator uses
+**Sign in enclave**, which is the approval the network counts, and then **Commit**.
 
 On commit the role is real, and the page shows it on the next load because it asks on every
 request. The enclave acts on the token from sign-in, though, so the teammate signs out and unlocks
