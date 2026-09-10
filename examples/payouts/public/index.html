@@ -276,7 +276,17 @@ async function renderPayees() {
     btn.onclick = async () => {
       btn.disabled = true; out.className = "out muted"; out.textContent = "asking the network…";
       try { out.textContent = await decrypt(p.bank_ciphertext); out.className = "out ok"; }
-      catch (e) { out.textContent = "refused: " + e.message; out.className = "out no"; }
+      catch (e) {
+        out.className = "out no";
+        // Roles here are read live, but the enclave acts on the token from sign-in. A role granted
+        // since then is real and not yet in hand.
+        const holds = me.roles.includes("vault-reader");
+        out.textContent = !holds
+          ? "refused: the network decrypts only for vault-reader, which this identity does not hold."
+          : !me.rolesAtUnlock.includes("vault-reader")
+            ? "refused: vault-reader was granted after you unlocked. Sign out and unlock again to carry it."
+            : "refused: " + e.message.split("\n")[0];
+      }
       finally { btn.disabled = false; }
     };
     $("payees").append(tr);

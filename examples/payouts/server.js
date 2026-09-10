@@ -61,6 +61,7 @@ app.get("/api/me", needUser(async (req, res, who) => {
     unlocked: !!who.tide,
     doken: who.tide?.doken ?? null,
     roles,
+    rolesAtUnlock: who.tide?.rolesAtUnlock ?? [],
   });
 }));
 
@@ -89,7 +90,10 @@ app.get("/tide/callback", async (req, res) => {
       return res.status(403).send("That Tide identity is not the one linked to this account");
     }
     const sid = crypto.randomUUID();
-    tideSessions.set(sid, { userId: user.id, vuid, doken });
+    // What the doken carries, roughly: the roles held at the moment it was minted. Kept so the page
+    // can tell a role granted since then from one never held.
+    const rolesAtUnlock = await rolesFor(vuid).catch(() => []);
+    tideSessions.set(sid, { userId: user.id, vuid, doken, rolesAtUnlock });
     res.cookie("tide", sid, { httpOnly: true, sameSite: "lax" });
     // No need to sign in to Supabase again: userFor asks Supabase for the user as it is now, not as
     // the token remembers it.

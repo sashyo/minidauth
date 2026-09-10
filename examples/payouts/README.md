@@ -125,9 +125,13 @@ curl -X POST http://localhost:8081/iga/change-requests/role \
   -d '{"vuid":"<their vuid>","role":"vault-reader"}'
 ```
 
-An administrator approves it in the [minidauth console](http://localhost:8081/console) with **Sign in
-enclave**, which the network counts. On commit the role is real, and this app sees it on the next
-page load because it asks on every request. `"revoke": true` takes it away the same way.
+Or use the form in the [minidauth console](http://localhost:8081/console), which does the same thing.
+Then, under change requests: **Approve** until the operator count is met, **Sign in enclave** as an
+administrator, which is the approval the network counts, and **Commit**.
+
+On commit the role is real, and the page shows it on the next load because it asks on every
+request. The enclave acts on the token from sign-in, though, so the teammate signs out and unlocks
+again to carry it. Revoking works the same way.
 
 ## What the network decides, and what this app decides
 

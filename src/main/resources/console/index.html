@@ -148,6 +148,35 @@
     background: var(--rule);
   }
 
+  input, select {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 10px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 2px solid var(--rule);
+    border-radius: 0;
+    box-shadow: inset 2px 2px 0 rgba(14,14,12,.07);
+  }
+
+  input:focus-visible, select:focus-visible {
+    outline: 3px solid var(--signal);
+    outline-offset: 2px;
+  }
+
+  /* An identity in the grants table fills the form, so nobody retypes a 36-character id. */
+  .pick {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    text-decoration: underline dotted;
+  }
+  .pick:active:not(:disabled) { transform: none; }
+
   /* ---------------------------------------------------------------- tables */
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -243,6 +272,30 @@
   <section>
     <h2>Change requests</h2>
     <div class="body"><div id="changeRequests" class="overflow muted">Sign in to see pending changes.</div></div>
+  </section>
+
+  <section>
+    <h2>Grant or revoke a role</h2>
+    <div class="body">
+      <p class="muted">Filing is only a request. Nothing changes until it is approved, signed by an
+        administrator in their own enclave, and committed, all in the panel above. Click an identity
+        under role grants to fill it in.</p>
+      <form id="roleForm" class="row">
+        <input id="roleVuid" class="grow mono" placeholder="vuid" required autocomplete="off">
+        <input id="roleName" list="knownRoles" placeholder="role" required style="width:190px">
+        <datalist id="knownRoles">
+          <option value="vault-reader"></option>
+          <option value="vault-writer"></option>
+          <option value="governance-admin"></option>
+        </datalist>
+        <select id="roleAction">
+          <option value="grant">Grant</option>
+          <option value="revoke">Revoke</option>
+        </select>
+        <button class="primary" type="submit">File request</button>
+      </form>
+      <p id="roleOut" class="muted" style="margin-top:8px"></p>
+    </div>
   </section>
 
   <section>
@@ -399,7 +452,8 @@ function renderGrants(list) {
   if (!list.length) return '<p class="muted">No roles granted.</p>';
   return `<table><thead><tr><th>Identity</th><th>Roles</th></tr></thead><tbody>` +
     list.map((g) => `<tr>
-      <td class="mono">${esc((g.vuid || "").slice(0, 16))}…</td>
+      <td class="mono"><button class="pick mono" data-pick="${esc(g.vuid)}"
+        title="${esc(g.vuid)}">${esc((g.vuid || "").slice(0, 16))}…</button></td>
       <td>${(g.roles || []).map((r) => '<span class="pill">' + esc(r) + "</span>").join(" ")}</td>
     </tr>`).join("") + "</tbody></table>";
 }
@@ -607,6 +661,35 @@ document.addEventListener("click", async (ev) => {
   } finally {
     ev.target.disabled = false;
     ev.target.textContent = label;
+  }
+});
+
+document.addEventListener("click", (ev) => {
+  const vuid = ev.target.getAttribute?.("data-pick");
+  if (!vuid) return;
+  $("roleVuid").value = vuid;
+  $("roleName").focus();
+});
+
+/* Filed with this tab's doken, so the request records who asked. The quorum still decides. */
+$("roleForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const revoke = $("roleAction").value === "revoke";
+  const out = $("roleOut");
+  out.className = "muted";
+  out.textContent = "Filing…";
+  try {
+    await api("/iga/change-requests/role", {
+      method: "POST",
+      body: JSON.stringify({ vuid: $("roleVuid").value.trim(), role: $("roleName").value.trim(), revoke }),
+    });
+    out.className = "good";
+    out.textContent = "Filed. Now Approve, Sign in enclave, then Commit it under change requests.";
+    $("roleForm").reset();
+    await refresh();
+  } catch (e) {
+    out.className = "bad";
+    out.textContent = e.message;
   }
 });
 
