@@ -1,0 +1,390 @@
+<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minidauth payouts</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230e0e0c'/><rect x='4' y='4' width='8' height='8' fill='%23d6371c'/></svg>">
+<style>
+  :root { --paper:#ece9e2; --ink:#0e0e0c; --signal:#d6371c; --ok:#1f7a3a; --sunk:#dedbd4; }
+  body{margin:0;padding:32px;background:var(--paper);color:var(--ink);max-width:980px;
+       font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+  h1{font-size:15px;text-transform:uppercase;letter-spacing:.12em;background:var(--ink);
+     color:var(--paper);display:inline-block;padding:6px 10px;margin:0 0 6px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin:30px 0 8px}
+  button,input,select{font:inherit;border:2px solid var(--ink);background:var(--paper);
+     color:inherit;padding:8px 10px}
+  button{cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+  button:active{transform:translate(3px,3px);box-shadow:none}
+  button[disabled]{opacity:.45;cursor:default;box-shadow:none}
+  .card{border:2px solid var(--ink);padding:14px;margin:0 0 14px;box-shadow:6px 6px 0 var(--ink)}
+  .pill{border:2px solid var(--ink);padding:1px 8px;font-size:13px;white-space:nowrap}
+  .no{color:var(--signal)} .ok{color:var(--ok)}
+  .stamp{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:13px}
+  pre{white-space:pre-wrap;word-break:break-all;background:var(--sunk);padding:10px;margin:8px 0 0;
+      border:2px solid var(--ink);max-height:260px;overflow:auto;font-size:12.5px}
+  .muted{opacity:.65}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .claims{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:18px 0}
+  .claims .card{margin:0}
+  .claims b{display:block;margin-bottom:4px}
+  table{border-collapse:collapse;width:100%}
+  td,th{border-top:2px solid var(--ink);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.08em;border-top:0}
+  .scroll{overflow-x:auto}
+</style>
+
+<h1>minidauth payouts</h1>
+<p><strong>Your Supabase holds the money trail. It cannot move the money.</strong></p>
+<p class="muted">A payouts tool on Supabase, with the decisions that matter moved somewhere a leaked
+secret key cannot reach. Each claim below is live on this page, not described.</p>
+
+<div class="claims">
+  <div class="card"><b>Bank details are ciphertext</b>Encrypted in the Tide enclave before they
+    leave your browser. Supabase stores bytes it has no key for.</div>
+  <div class="card"><b>Reading them takes a quorum</b>The network decrypts only for
+    <code>vault-reader</code>, a role administrators grant by approving in their own enclaves.</div>
+  <div class="card"><b>A payout is a signature</b>Fourteen of twenty independent nodes sign the
+    instruction, and refuse anything over the limit. Edit a row and it stops verifying.</div>
+</div>
+
+<div id="setup" class="card" hidden></div>
+<div id="who" class="card"></div>
+
+<div id="app" hidden>
+  <h2>1. Payees</h2>
+  <div class="card">
+    <div class="row">
+      <input id="payeeName" placeholder="payee" value="Acme Supplies" style="flex:1;min-width:160px">
+      <input id="payeeBank" placeholder="bank details" value="BSB 062-000, account 1234 5678"
+             style="flex:2;min-width:220px">
+      <button id="addPayee">Encrypt and save</button>
+    </div>
+    <p id="payeeState" class="muted"></p>
+    <div class="scroll"><table id="payees"></table></div>
+  </div>
+
+  <h2>2. Payouts</h2>
+  <div class="card">
+    <p class="muted">Anyone here can ask for a payout. Only the network can make one real: it signs
+      instructions up to <strong id="limit">its limit</strong> and refuses the rest, and this app
+      checks that signature every time it reads a row.</p>
+    <div class="row">
+      <select id="payoutPayee" style="min-width:200px"></select>
+      <input id="payoutAmount" value="250" style="width:110px" inputmode="numeric">
+      <button id="addPayout">Request payout</button>
+      <span class="muted">try 250, then 5000</span>
+    </div>
+    <p id="payoutState" class="muted"></p>
+    <div class="scroll"><table id="payouts"></table></div>
+  </div>
+
+  <h2>3. What your secret key gets an attacker</h2>
+  <div class="card">
+    <p class="muted">Both tables, exactly as Supabase returns them to the secret key, which bypasses
+      every row level policy. This is the whole prize for leaking it.</p>
+    <pre id="breach">loading…</pre>
+    <p><strong>Try it.</strong> Open this project's Table Editor in Supabase, change the amount on a
+      signed payout, and reload. The row turns <span class="no stamp">forged</span>, because the
+      network signed the old amount and nobody can produce a signature for the new one.</p>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const $ = (id) => document.getElementById(id);
+const api = async (p, o) => {
+  const r = await fetch(p, o);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error ?? r.statusText);
+  return body;
+};
+const post = (p, body) => api(p, { method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body) });
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+const b64ToBytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+const bytesToB64 = (b) => { let s = ""; const u = new Uint8Array(b);
+  for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+
+let me = null, enclaveCfg = null, payeeNames = {};
+
+/* One enclave window for the page's lifetime. The session key lives in there and never leaves, so
+ * reopening would mean signing in again for a doken bound to a different key. */
+let enclave = null;
+function openEnclave() {
+  if (enclave && !enclave.win.closed) return enclave.ready;
+
+  const url = new URL(enclaveCfg.homeOrkUrl);
+  url.searchParams.set("type", "request");
+  url.searchParams.set("hidden", "false");
+  url.searchParams.set("vendorId", enclaveCfg.vvkId);
+  url.searchParams.set("origin", encodeURIComponent(location.origin));
+  url.searchParams.set("originsig", encodeURIComponent(enclaveCfg.clientOriginAuth));
+  url.searchParams.set("voucherURL", encodeURIComponent(enclaveCfg.voucherUrl));
+
+  const origin = new URL(enclaveCfg.homeOrkUrl).origin;
+  const win = window.open(url.toString(), "tide-enclave", "width=520,height=760");
+  if (!win) throw new Error("The enclave window was blocked. Allow popups for this page.");
+
+  const sessionId = Array.from(crypto.getRandomValues(new Uint32Array(5)),
+    (v) => v.toString(16).padStart(8, "0")).join("");
+  const waiters = new Map();
+
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("the enclave did not answer")), 120000);
+    window.addEventListener("message", (ev) => {
+      if (ev.origin !== origin) return;
+      const { type, message } = ev.data ?? {};
+      if (type === "session check") {
+        win.postMessage({ type: "current session", message: sessionId }, origin);
+        return;
+      }
+      if (type === "pageLoaded") {
+        win.postMessage({ type: "init", message: { doken: me.doken, sessionId } }, origin);
+        return;
+      }
+      if (type === "init done") { clearTimeout(timer); resolve(); return; }
+      const waiter = waiters.get(type);
+      if (waiter) {
+        waiters.delete(type);
+        if (message?.error) waiter.reject(new Error(message.error));
+        else waiter.resolve(message);
+      }
+    });
+  });
+
+  const ask = (msg, replyType) => new Promise((resolve, reject) => {
+    waiters.set(replyType, { resolve, reject });
+    win.postMessage({ type: "request", message: msg }, origin);
+  });
+
+  enclave = { win, ready, ask };
+  return ready;
+}
+
+async function encrypt(text) {
+  await openEnclave();
+  const out = await enclave.ask({
+    flow: "policy encrypt",
+    request: [{ data: new TextEncoder().encode(text), tags: ["bank"] }],
+    policy: b64ToBytes(enclaveCfg.encryptPolicy),
+  }, "encrypt request completed");
+  const first = Array.isArray(out) ? out[0] : out;
+  return bytesToB64(first instanceof Uint8Array ? first : new Uint8Array(first));
+}
+
+async function decrypt(ciphertext) {
+  if (!enclaveCfg.decryptPolicy) throw new Error("no decryption policy is deployed");
+  await openEnclave();
+  const out = await enclave.ask({
+    flow: "policy decrypt",
+    request: [{ encrypted: b64ToBytes(ciphertext), tags: ["bank"] }],
+    policy: b64ToBytes(enclaveCfg.decryptPolicy),
+  }, "decrypt request completed");
+  const first = Array.isArray(out) ? out[0] : out;
+  return typeof first === "string" ? first
+    : new TextDecoder().decode(first instanceof Uint8Array ? first : new Uint8Array(first));
+}
+
+/* Signing an instruction of our own. The network first signs the request's creation, which is what
+ * lets a policy authorise it at all, then reads the instruction through the policy's contract and
+ * signs it or refuses. */
+async function sign(text) {
+  if (!enclaveCfg.paymentPolicy) throw new Error("no payment policy is deployed");
+  const { Models, Tools } = await import("https://esm.sh/@tideorg/js@0.14.25");
+  const { BaseTideRequest } = Models;
+  const { TideMemory } = Tools;
+
+  const [name, version] = enclaveCfg.paymentModel.split(":");
+  const draft = TideMemory.CreateFromArray([new TextEncoder().encode(text)]);
+  const request = new BaseTideRequest(name, version, "Policy:1", draft, new TideMemory());
+  request.addPolicy(b64ToBytes(enclaveCfg.paymentPolicy));
+
+  await openEnclave();
+
+  const details = await request.getRequestInitDetails();
+  const init = new BaseTideRequest("TideRequestInitialization", "1", "Doken:1",
+    TideMemory.CreateFromArray([details.creationTime, details.expireTime, details.modelId,
+      details.draftHash]),
+    new TideMemory());
+  init.addPolicy(b64ToBytes(enclaveCfg.paymentPolicy));
+
+  const creationSig = (await enclave.ask(
+    { flow: "sign", request: init.encode(), waitForAll: false }, "sign request completed"))[0];
+  request.addCreationSignature(details.creationTime, creationSig);
+
+  const signatures = await enclave.ask(
+    { flow: "sign", request: request.encode(), waitForAll: false }, "sign request completed");
+  return bytesToB64(signatures[0]);
+}
+
+/* ---- sign-in ---- */
+
+async function renderWho(sb) {
+  if (!me) {
+    $("who").innerHTML = `<p><b>Step one: Supabase.</b> Sign in as you would to any Supabase app.
+        minidauth never sees this password.</p>
+      <div class="row"><input id="email" placeholder="email">
+        <input id="password" type="password" placeholder="password">
+        <button id="go">Sign up or sign in</button></div>
+      <p id="authOut" class="no"></p>`;
+    $("go").onclick = async () => {
+      const email = $("email").value, password = $("password").value;
+      let { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) ({ data, error } = await sb.auth.signUp({ email, password }));
+      if (error) return ($("authOut").textContent = error.message);
+      if (!data.session) {
+        return ($("authOut").textContent =
+          "Check your email to confirm, or turn confirmations off in Supabase.");
+      }
+      document.cookie = "sb=" + data.session.access_token + "; path=/; samesite=lax";
+      location.reload();
+    };
+    return;
+  }
+
+  const roles = me.roles.length ? me.roles.map((r) => `<span class="pill">${esc(r)}</span>`).join(" ")
+    : '<span class="no">no roles granted</span>';
+  $("who").innerHTML = `<div class="row"><b>${esc(me.email)}</b>
+      <span class="muted">Supabase ${esc(me.userId.slice(0, 8))}</span>
+      ${me.vuid ? `<span class="muted" title="${esc(me.vuid)}">Tide ${esc(me.vuid.slice(0, 12))}…</span> ${roles}` : ""}
+      <button id="out" style="margin-left:auto">Sign out</button></div>
+    ${me.unlocked ? "" : `<p><b>Step two: Tide.</b> ${me.vuid
+        ? "Unlock this session with the Tide identity linked to your account."
+        : "Link a Tide identity. The password goes into a page served by the Tide network, not to this app."}
+      What you may do here comes from roles only a quorum can grant, never from your Supabase token.</p>
+      <button id="unlock">${me.vuid ? "Unlock with Tide" : "Link Tide identity"}</button>`}`;
+  $("out").onclick = async () => { await sb.auth.signOut(); await api("/api/logout"); location.reload(); };
+  if ($("unlock")) $("unlock").onclick = async () => {
+    try { location.href = (await api("/api/tide/start")).url; }
+    catch (e) { alert(e.message); }
+  };
+}
+
+/* ---- payees ---- */
+
+async function renderPayees() {
+  const rows = await api("/api/payees");
+  payeeNames = Object.fromEntries(rows.map((p) => [p.id, p.name]));
+  $("payoutPayee").innerHTML = rows.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  $("payees").innerHTML = rows.length ? `<tr><th>payee</th><th>bank details, as Supabase has them</th><th></th></tr>`
+    : `<tr><td class="muted">No payees yet. Add one above.</td></tr>`;
+  for (const p of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(p.name)}</td>
+      <td><span class="muted">${esc(p.bank_ciphertext.slice(0, 44))}…</span><div class="out"></div></td>
+      <td><button>Reveal</button></td>`;
+    const btn = tr.querySelector("button"), out = tr.querySelector(".out");
+    btn.onclick = async () => {
+      btn.disabled = true; out.className = "out muted"; out.textContent = "asking the network…";
+      try { out.textContent = await decrypt(p.bank_ciphertext); out.className = "out ok"; }
+      catch (e) { out.textContent = "refused: " + e.message; out.className = "out no"; }
+      finally { btn.disabled = false; }
+    };
+    $("payees").append(tr);
+  }
+}
+
+$("addPayee").onclick = async () => {
+  const btn = $("addPayee"); btn.disabled = true;
+  $("payeeState").textContent = "encrypting in the enclave…";
+  try {
+    const bankCiphertext = await encrypt($("payeeBank").value);
+    await post("/api/payees", { name: $("payeeName").value, bankCiphertext });
+    $("payeeState").textContent = "saved to Supabase as ciphertext";
+    await refresh();
+  } catch (e) { $("payeeState").textContent = "failed: " + e.message; }
+  finally { btn.disabled = false; }
+};
+
+/* ---- payouts ---- */
+
+function stamp(p) {
+  if (p.status === "pending") return `<span class="stamp muted">pending</span>`;
+  if (p.status === "refused") return `<span class="stamp no">refused</span><br>
+    <span class="no">${esc(p.refusal)}</span>`;
+  return p.check?.valid ? `<span class="stamp ok">signed, verifies</span>`
+    : `<span class="stamp no">forged</span><br><span class="no">${esc(p.check?.reason)}</span>`;
+}
+
+async function renderPayouts() {
+  const rows = await api("/api/payouts");
+  $("payouts").innerHTML = rows.length
+    ? `<tr><th>payee</th><th>amount</th><th>status</th><th>instruction on file</th><th></th></tr>`
+    : `<tr><td class="muted">No payouts yet.</td></tr>`;
+  for (const p of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(payeeNames[p.payee_id] ?? p.payee_id.slice(0, 8))}</td>
+      <td>${p.amount}</td><td>${stamp(p)}</td>
+      <td class="muted" style="word-break:break-all">${esc(p.instruction)}</td>
+      <td>${p.status === "pending" ? "<button>Ask the network</button>" : ""}</td>`;
+    const btn = tr.querySelector("button");
+    if (btn) btn.onclick = () => decide(p, btn);
+    $("payouts").append(tr);
+  }
+}
+
+/* The enclave reports a refusal as one error per node. What matters is how many of them read the
+ * instruction and said no, and why, so that is what gets kept. */
+function refusalOf(e) {
+  const said = [...e.message.matchAll(/policy denied \(Data\): (.+?)\s*\(gas/g)].map((m) => m[1]);
+  if (!said.length) return e.message.split("\n")[0];
+  const counts = said.reduce((c, r) => c.set(r, (c.get(r) ?? 0) + 1), new Map());
+  const [reason, n] = [...counts].sort((a, b) => b[1] - a[1])[0];
+  return `${n} nodes refused: ${reason}`;
+}
+
+async function decide(p, btn) {
+  btn.disabled = true;
+  $("payoutState").textContent = `asking the network to sign ${p.instruction}…`;
+  try {
+    const signature = await sign(p.instruction);
+    await post(`/api/payouts/${p.id}/decision`, { signature });
+    $("payoutState").textContent = "signed by the network, and verified here before saving";
+  } catch (e) {
+    const refusal = refusalOf(e);
+    await post(`/api/payouts/${p.id}/decision`, { refusal }).catch(() => {});
+    $("payoutState").textContent = "the network refused. " + refusal;
+  }
+  await refresh();
+}
+
+$("addPayout").onclick = async () => {
+  const btn = $("addPayout"); btn.disabled = true;
+  try {
+    await post("/api/payouts", { payeeId: $("payoutPayee").value,
+      amount: Number($("payoutAmount").value) });
+    await refresh();
+    $("payoutState").textContent = "requested. Nothing is paid until the network signs it.";
+  } catch (e) { $("payoutState").textContent = "failed: " + e.message; }
+  finally { btn.disabled = false; }
+};
+
+async function refresh() {
+  await renderPayees();
+  await renderPayouts();
+  $("breach").textContent = JSON.stringify(await api("/api/breach"), null, 2);
+}
+
+/* ---- start ---- */
+
+const cfg = await api("/api/config");
+if (cfg.missing) {
+  $("setup").hidden = false;
+  $("setup").innerHTML = `<b>Not configured yet.</b> Set ${cfg.missing.map((m) => `<code>${m}</code>`).join(", ")}
+    in <code>.env</code> and restart. The README has the three values and where to find them.`;
+} else {
+  if (cfg.schemaMissing) {
+    $("setup").hidden = false;
+    $("setup").innerHTML = `<b>One more step.</b> Paste <code>schema.sql</code> into your Supabase
+      project's SQL Editor and run it, then reload.`;
+  }
+  const sb = createClient(cfg.url, cfg.anonKey);
+  me = await api("/api/me").catch(() => null);
+  await renderWho(sb);
+  if (me?.unlocked && !cfg.schemaMissing) {
+    $("app").hidden = false;
+    enclaveCfg = await api("/api/enclave");
+    if (enclaveCfg.paymentLimit != null) $("limit").textContent = enclaveCfg.paymentLimit;
+    await refresh();
+  }
+}
+</script>

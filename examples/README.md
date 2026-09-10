@@ -2,7 +2,14 @@
 
 ## Start here
 
-**[notes](notes)** is the only one that shows what minidauth is *for* rather than how to wire it in.
+**[payouts](payouts)** is a real app on Supabase: login, Postgres, a server holding the secret key.
+Then it shows what that key gets somebody who steals it. Bank details are ciphertext, reading them
+takes a role only a quorum can grant, and a payout exists only if the Tide network signed it. Edit a
+signed row in Supabase and it turns forged on the next load.
+
+![The payouts demo](payouts/docs/demo.gif)
+
+**[notes](notes)** is the smallest version of the same idea, with no login provider at all.
 Write a note and it is encrypted inside the enclave; the page then prints the database so you can see
 it holds nothing but ciphertext. It also asks the network to sign a payment and gets refused for
 being over the policy's limit, which is the part encryption cannot do.

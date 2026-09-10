@@ -1,0 +1,11 @@
+{
+  "name": "minidauth-payouts",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node --env-file-if-exists=.env server.js" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2"
+  }
+}

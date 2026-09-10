@@ -222,9 +222,13 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
-**[examples/notes](examples/notes) is the one to look at first.** Write a note, watch it get
-encrypted inside the enclave, then read the database and find nothing but ciphertext. It is the
-claim at the top of this file, made checkable in a page.
+**[examples/payouts](examples/payouts) is the one to look at first if you run Supabase.** A payouts
+tool whose Supabase holds the money trail but cannot move the money: bank details stored as
+ciphertext, a reveal only a quorum-granted role can do, and payouts that exist only as network
+signatures. Change an amount in Supabase and the row turns forged, checked with plain Ed25519.
+
+**[examples/notes](examples/notes)** is the smallest version. Write a note, watch it get encrypted
+inside the enclave, then read the database and find nothing but ciphertext.
 
 The rest are integrations, and the point of having several is that the minidauth half never
 changes. It is the same file in all four. Authentication stays where it is; authorisation comes
