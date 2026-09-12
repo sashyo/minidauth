@@ -22,6 +22,12 @@ gating each operation on that role. Proven end to end against the live network. 
 users who should not need a second login, while the accounts that read everyone's data keep real Tide
 identities.
 
+**[tideless-web](tideless-web)** is that same no-account flow in a real browser, click-through: a page
+that encrypts and decrypts with no doken, and a small server that proxies the vouchers so the browser
+never holds a credential.
+
+![tideless-web](tideless-web/docs/demo.png)
+
 ## Then the integrations
 
 Five auth systems, one integration. The point of having several is that the minidauth part does not
