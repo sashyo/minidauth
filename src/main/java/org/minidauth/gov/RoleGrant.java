@@ -44,6 +44,21 @@ public final class RoleGrant {
     public Set<String> roles = new LinkedHashSet<>();
 
     /**
+     * True when the subject is not a Tide identity but an application user id (e.g. a Clerk uid).
+     *
+     * <p>Such a subject never signs in to the enclave, so there is no doken to carry these roles and
+     * nothing to attest. The roles are enforced by this service checking the record before it signs
+     * for the user or issues a decrypt voucher on their behalf, rather than by the cohort checking a
+     * doken. {@link #signedUnits} therefore stays empty, which is also what stops these roles ever
+     * being replayed into a token: the doken path refuses a grant with roles and no signed units.
+     *
+     * <p>The gate is still a quorum. The change is filed, authorized and committed the same way; it
+     * simply skips the network attestation step, because there is no identity for the cohort to
+     * attest.
+     */
+    public boolean tideless;
+
+    /**
      * The cohort-signed attestation units that make the roles above real.
      *
      * <p>Replayed verbatim when a doken is minted. They are bytes and a signature over exactly

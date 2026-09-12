@@ -16,6 +16,12 @@ being over the policy's limit, which is the part encryption cannot do.
 
 ![The demo](notes/docs/demo.gif)
 
+**[tideless](tideless)** is the other direction: encrypt, sign and decrypt for a user who has **no
+Tide account and no doken**. A quorum grants an app user id a role, and minidauth acts on their behalf,
+gating each operation on that role. Proven end to end against the live network. Use it for regular
+users who should not need a second login, while the accounts that read everyone's data keep real Tide
+identities.
+
 ## Then the integrations
 
 Five auth systems, one integration. The point of having several is that the minidauth part does not

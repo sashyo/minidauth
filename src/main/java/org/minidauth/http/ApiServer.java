@@ -294,14 +294,19 @@ public final class ApiServer implements AutoCloseable {
                     "roles", gov.rolesFor(p.get("vuid"))));
         });
 
-        /* File a grant or revocation. Takes effect only once the quorum commits it. */
+        /* File a grant or revocation. Takes effect only once the quorum commits it.
+         *
+         * {@code vuid} is the subject: a Tide identity by default, or an application user id (a Clerk
+         * uid, say) when {@code tideless} is true. A tideless grant carries no attestation and is
+         * enforced by this service when it signs or vouchers for that user, not by a doken. */
         router.post("/iga/change-requests/role", (ex, p) -> {
             Operator by = authenticate(ex);
             Map<String, Object> body = Json.readBody(ex);
             ChangeRequest cr = gov.fileRoleChange(by,
                     Json.requireString(body, "vuid"),
                     Json.requireString(body, "role"),
-                    Boolean.TRUE.equals(body.get("revoke")));
+                    Boolean.TRUE.equals(body.get("revoke")),
+                    Boolean.TRUE.equals(body.get("tideless")));
             ex.getResponseHeaders().add("Location", "/iga/change-requests/" + cr.id);
             Json.send(ex, 202, cr);
         });
@@ -416,6 +421,47 @@ public final class ApiServer implements AutoCloseable {
             Map<String, Object> body = Json.readBody(ex);
             Json.send(ex, 200, gov.approveWithEnclave(by, p.get("id"),
                     Json.requireString(body, "doken")));
+        });
+
+        /* Sign a payload on behalf of an application user who has no Tide identity.
+         *
+         * The user never holds a doken. The calling app authenticates here with its own token and
+         * passes the user id it verified from its own login (Clerk, say) and the role that gates this
+         * operation. This service checks the user's committed, quorum-approved grant holds that role,
+         * and only then asks the cohort to sign. The authority over who may sign is a governed record
+         * read here, not a doken the cohort checks, which is the whole point of the tideless path.
+         *
+         * The signature that comes back is an ordinary VVK threshold signature: verifiable by anyone
+         * with the vendor public key, over exactly the payload sent. */
+        router.post("/vault/sign", (ex, p) -> {
+            authenticate(ex);
+            Map<String, Object> body = Json.readBody(ex);
+            String signature = gov.signForSubject(
+                    Json.requireString(body, "uid"),
+                    Json.requireString(body, "role"),
+                    Json.requireString(body, "payload").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Json.send(ex, 200, Map.of("signature", signature));
+        });
+
+        /* Issue a decrypt voucher on behalf of an application user who has no Tide identity.
+         *
+         * The browser builds the voucher request (this service cannot: a voucher is bound to values
+         * the browser's decrypt flow chooses). What this service decides is WHETHER to issue it: it
+         * checks the user's quorum-approved grant holds the gating role first. With the voucher the
+         * browser runs the threshold decrypt against the cohort; without it the cohort refuses. So
+         * the read gate is this service reading a governed role, and the decrypt still happens in the
+         * browser with the key never assembled. */
+        router.post("/vault/voucher", (ex, p) -> {
+            authenticate(ex);
+            Map<String, Object> body = Json.readBody(ex);
+            if (!gov.subjectHolds(Json.requireString(body, "uid"), Json.requireString(body, "role"))) {
+                throw new Json.HttpError(403, Json.requireString(body, "uid")
+                        + " does not hold " + Json.requireString(body, "role")
+                        + ", so this service will not voucher a decrypt for them");
+            }
+            Json.sendRaw(ex, 200,
+                    tideAuth.vouchers(Json.requireString(body, "voucherRequest")),
+                    "application/json; charset=utf-8");
         });
 
         // Read-only view of the configured roster and the bar it sets. The roster itself is
