@@ -107,3 +107,51 @@ export function completeLogin(encryptedVendorData, sessionId) {
 export function rolesFor(vuid) {
   return call("/iga/grants/" + encodeURIComponent(vuid)).then((r) => r.roles ?? []);
 }
+
+// ---------------------------------------------------------------------------
+// Tideless: acting for a user who has no Tide account of their own.
+//
+// The three calls above link a Tide identity to each user. These let the app
+// encrypt, sign and decrypt on behalf of a user who never signs in to Tide —
+// the app's own user id is the subject, and a role a quorum granted it is the
+// gate. See examples/tideless and examples/tideless-web.
+
+/** Fetch a raw (unparsed) body, for the voucher endpoints which return a voucher verbatim. */
+async function raw(path, init = {}) {
+  const res = await fetch(BASE() + path, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: authorization(), ...(init.headers ?? {}) },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = text;
+    try { msg = JSON.parse(text).error ?? text; } catch { /* not json */ }
+    throw new Error(msg || `${res.status} ${res.statusText}`);
+  }
+  return text;
+}
+
+/** Public config a browser needs to reach the network and (de)crypt: key id, home ORK, policy bytes. */
+export async function vaultConfig() {
+  const [cfg, enc, dec] = await Promise.all([
+    call("/tide/enclave/config"),
+    call("/vault/encrypt-policy"),
+    call("/vault/decrypt-policy"),
+  ]);
+  return { vvkId: cfg.vvkId, homeOrkUrl: cfg.homeOrkUrl, encryptPolicy: enc.policy, decryptPolicy: dec.policy };
+}
+
+/** Mint an encrypt (vendorsign) voucher. Any configured operator may; the app token is enough. */
+export function signVoucher(voucherRequest) {
+  return raw("/tide/vouchers", { method: "POST", body: JSON.stringify({ voucherRequest }) });
+}
+
+/**
+ * Mint a decrypt (vendordecrypt) voucher for `uid`, gated on it holding `role`.
+ *
+ * The uid is decided by the app server (from its own verified session), never by the browser, so a
+ * page cannot voucher a read for a user other than the one calling.
+ */
+export function decryptVoucher(uid, role, voucherRequest) {
+  return raw("/vault/voucher", { method: "POST", body: JSON.stringify({ uid, role, voucherRequest }) });
+}

@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import crypto from "node:crypto";
 import * as auth0 from "./auth0.js";
 import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { tideless } from "../shared/tideless.js";
 import { page, identityBlock } from "../shared/page.js";
 
 const app = express();
@@ -14,6 +15,8 @@ app.use(cookieParser());
 const sessions = new Map();
 const pending = new Map();
 const current = (req) => sessions.get(req.cookies.sid);
+// A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
+app.use(tideless({ resolveUid: async (req) => current(req)?.sub, role: "vault-reader" }));
 
 app.get("/", async (req, res) => {
   const missing = auth0.missingConfig();

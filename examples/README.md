@@ -42,6 +42,12 @@ steps in each, with a different login provider:
 | [auth0](auth0) | :3002 | **Run end to end**, with a [walkthrough](auth0#what-it-looks-like) |
 | [cognito](cognito) | :3001 | `npm run setup` builds the pool, but AWS wants a card |
 
+Each of these five also mounts a **`/tideless`** page — the same no-account encrypt/decrypt as
+[tideless-web](tideless-web), but with that provider's own login identifying the user. It shares one
+file, [`shared/tideless.js`](shared/tideless.js); only the "who is signed in" resolver differs per
+provider. See each example's README for the two prerequisites (a PUBLIC decrypt policy, and granting
+the user's id a tideless role).
+
 ## The pattern, in three steps
 
 **1. Store one field.** The Tide identity, on your user record. Where it goes depends on what you

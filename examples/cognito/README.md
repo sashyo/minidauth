@@ -68,3 +68,29 @@ a link. The standard AWS environment variables are picked up.
 The minidauth half of this is the same code as [the Better Auth example](../better-auth), which is
 exercised against the live network. The Cognito half is written from the API and has not been run
 against a real user pool yet. If you run it and it is wrong, that is worth an issue.
+
+
+## Tideless: encrypt & decrypt with no Tide account
+
+This example also mounts a **tideless** page at `/tideless` (see
+[`../shared/tideless.js`](../shared/tideless.js)). It is the opposite of linking a Tide identity: the
+signed-in Cognito user encrypts and decrypts with **no Tide account and no doken**. Their own
+the Cognito subject (sub) is the subject, and a role a quorum granted that id is the gate; minidauth issues the
+vouchers and the ORK cohort does the crypto. The browser holds no credential — the server proxies
+the vouchers and sets the uid from its own verified session, so a page cannot read as another user.
+
+Two prerequisites, both one-time:
+
+- minidauth must have a **PUBLIC** decrypt policy (voucher-gated, not doken-gated). A key's decrypt
+  policy is either PUBLIC or PRIVATE, so this is a different key/policy from the account-linked flow
+  above. See [docs/running.md](../../docs/running.md).
+- Grant the user's id a role as a tideless subject, through the quorum:
+
+  ```sh
+  curl -sX POST localhost:8081/iga/change-requests/role -H "Authorization: Bearer $ALICE" \
+    -H 'Content-Type: application/json' -d '{"vuid":"<cognito user id>","role":"vault-reader","tideless":true}'
+  # $BOB and $CAROL authorize, then commit
+  ```
+
+Then sign in and open `/tideless`. The trade this makes — minidauth becomes the authority for these
+users' reads — is spelled out in [examples/tideless](../tideless#the-trade-you-are-making).
