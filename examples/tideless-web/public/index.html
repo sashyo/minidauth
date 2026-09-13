@@ -1,0 +1,139 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tideless — browser round trip</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --paper:#ece9e2; --card:#f4f2ed; --ink:#0e0e0c; --muted:#625f57; --hair:#c3bfb4; --signal:#d6371c; --ok:#1f7a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 20px; background:var(--paper); color:var(--ink);
+         font:14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  main { max-width:760px; margin:0 auto; }
+  h1 { font-size:14px; text-transform:uppercase; letter-spacing:.14em; margin:0 0 4px;
+       background:var(--ink); color:var(--paper); display:inline-block; padding:6px 10px; }
+  p.lede { color:var(--muted); max-width:64ch; }
+  .who { border:1px solid var(--hair); background:var(--card); padding:10px 12px; margin:14px 0; }
+  .who b { color:var(--signal); }
+  button { font:inherit; border:2px solid var(--ink); background:var(--paper); padding:9px 16px;
+           cursor:pointer; box-shadow:3px 3px 0 var(--ink); }
+  button:active { transform:translate(3px,3px); box-shadow:none; }
+  button[disabled] { opacity:.45; cursor:default; box-shadow:none; }
+  ol { padding-left:0; list-style:none; margin:18px 0; }
+  li { border:1px solid var(--hair); border-left:3px solid var(--hair); background:var(--card);
+       padding:9px 12px; margin:8px 0; display:flex; gap:10px; align-items:baseline; }
+  li .n { color:var(--muted); font-size:12px; min-width:1.5em; }
+  li.run { border-left-color:var(--signal); }
+  li.done { border-left-color:var(--ok); }
+  li .v { color:var(--muted); margin-left:auto; word-break:break-all; text-align:right; max-width:52ch; }
+  pre { white-space:pre-wrap; word-break:break-all; background:var(--card); border:1px solid var(--hair);
+        padding:10px; margin:6px 0 0; }
+  .verdict { font-size:15px; font-weight:700; padding:12px; margin-top:14px; border:2px solid var(--ink); }
+  .verdict.ok { color:var(--ok); } .verdict.no { color:var(--signal); }
+  .hidden { display:none; }
+</style>
+
+<main>
+  <h1>Tideless round trip</h1>
+  <p class="lede">Encrypt and decrypt in this browser with <b>no Tide account and no doken</b>. The
+  vendor key is never assembled; the ORK cohort does the crypto. The only thing that says this user
+  may read is a role a quorum granted — checked by minidauth when it issues the decrypt voucher.</p>
+
+  <div class="who" id="who">Loading…</div>
+  <button id="run" disabled>Run encrypt → decrypt</button>
+
+  <ol id="steps" class="hidden">
+    <li id="s-enc"><span class="n">1</span><span>Encrypt in-browser, authorised by a <code>vendorsign</code> voucher (no doken)</span><span class="v"></span></li>
+    <li id="s-dec"><span class="n">2</span><span>Decrypt in-browser, authorised by a role-gated <code>vendordecrypt</code> voucher (no doken)</span><span class="v"></span></li>
+  </ol>
+
+  <div id="io" class="hidden">
+    <div>plaintext<pre id="pt"></pre></div>
+    <div>ciphertext (stored)<pre id="ct"></pre></div>
+    <div>recovered<pre id="rc"></pre></div>
+  </div>
+  <div id="verdict"></div>
+</main>
+
+<script type="module">
+import { Clients, Flow, Cryptide } from 'https://esm.sh/@tideorg/js@0.14.25';
+import PPSF from 'https://esm.sh/@tideorg/js@0.14.25/dist/Models/PolicyProtectedSerializedField.js';
+import Ed25519Scheme from 'https://esm.sh/@tideorg/js@0.14.25/dist/Cryptide/Components/Schemes/Ed25519/Ed25519Scheme.js';
+
+const NetworkClient = Clients.NetworkClient;
+const { dVVKSigningFlow } = Flow.SigningFlows;
+const { dVVKDecryptionFlow } = Flow.DecryptionFlows;
+const { PolicyAuthorizedEncryptionFlow } = Flow.EncryptionFlows;
+const TideKey = Cryptide.TideKey;
+const AES = Cryptide.Encryption.AES;
+
+const $ = id => document.getElementById(id);
+const b64ToBytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+const bytesToB64 = u8 => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s); };
+const voucher = path => req => fetch(path, { method: 'POST', body: req }).then(async r => {
+  const t = await r.text(); if (!r.ok) throw new Error(t); return t;
+});
+
+let cfg;
+(async () => {
+  cfg = await (await fetch('/api/config')).json();
+  $('who').innerHTML = `Signed in as <b>${cfg.user}</b> — an app user id, not a Tide account. ` +
+    `A quorum granted it <b>${cfg.role}</b>. That is the whole basis on which the network will decrypt for it.`;
+  $('run').disabled = false;
+})().catch(e => { $('who').textContent = 'Could not reach the service: ' + e.message; });
+
+$('run').addEventListener('click', async () => {
+  $('run').disabled = true;
+  $('steps').classList.remove('hidden'); $('io').classList.remove('hidden');
+  $('verdict').textContent = ''; $('verdict').className = '';
+  const enc = $('s-enc'), dec = $('s-dec');
+  enc.className = dec.className = ''; enc.querySelector('.v').textContent = ''; dec.querySelector('.v').textContent = '';
+  try {
+    const plaintext = 'no account, no doken — ' + new Date().toISOString();
+    $('pt').textContent = plaintext;
+
+    const encPolicy = b64ToBytes(cfg.encryptPolicy);
+    const decPolicy = b64ToBytes(cfg.decryptPolicy);
+    const keyInfo = await new NetworkClient(cfg.homeOrkUrl).GetKeyInfo(cfg.vvkId);
+
+    const sessKey = TideKey.NewKey(Ed25519Scheme);
+    // A guest doken: the flows only use doken.serialize() as the ORK token, and "" trips the
+    // gSessKey (no-token) path. This is the seam a first-class guest flow would formalise.
+    const guest = { payload: { sessionKey: sessKey.get_public_component() }, serialize: () => '' };
+    const pae = new PolicyAuthorizedEncryptionFlow({ vendorId: cfg.vvkId, token: guest, sessionKey: sessKey, voucherURL: '', keyInfo });
+
+    // 1. Encrypt.
+    enc.className = 'run';
+    const { request: encReq, encReqs, timestamp } = await pae.createEncryptionRequest([{ data: new TextEncoder().encode(plaintext), tags: ['vault'] }]);
+    encReq.addPolicy(encPolicy);
+    const signFlow = new dVVKSigningFlow(cfg.vvkId, keyInfo.UserPublic, keyInfo.OrkInfo.slice(), sessKey, guest, '');
+    signFlow.setVoucherRetrievalFunction(voucher('/api/voucher/sign'));
+    const sigs = await signFlow.start(encReq);
+    const cipher = PPSF.create(encReqs[0].encryptedData, timestamp, encReqs[0].sizeLessThan32 ? null : encReqs[0].encryptionToSign, sigs[0]);
+    $('ct').textContent = bytesToB64(cipher);
+    enc.className = 'done'; enc.querySelector('.v').textContent = cipher.length + ' bytes';
+
+    // 2. Decrypt.
+    dec.className = 'run';
+    const { request: decReq } = pae.createDecryptionRequest([{ encrypted: cipher, tags: ['vault'] }]);
+    decReq.addPolicy(decPolicy);
+    const decFlow = new dVVKDecryptionFlow(cfg.vvkId, keyInfo.UserPublic, keyInfo.OrkInfo.slice(), sessKey, guest, '');
+    decFlow.setVoucherRetrievalFunction(voucher('/api/voucher/decrypt'));
+    const dataKeys = await decFlow.start(decReq);
+    const b = PPSF.deserialize(cipher);
+    const out = b.encKey && b.encKey.length
+      ? await AES.decryptDataRawOutput(b.encFieldChk, await AES.decryptDataRawOutput(b.encKey.slice(32), dataKeys[0]))
+      : await AES.decryptDataRawOutput(b.encFieldChk.slice(32), dataKeys[0]);
+    const recovered = new TextDecoder().decode(out);
+    $('rc').textContent = recovered;
+    dec.className = 'done'; dec.querySelector('.v').textContent = 'recovered';
+
+    const ok = recovered === plaintext;
+    $('verdict').textContent = ok ? 'ROUND TRIP OK — no account, no doken' : 'MISMATCH';
+    $('verdict').className = 'verdict ' + (ok ? 'ok' : 'no');
+  } catch (e) {
+    $('verdict').textContent = 'failed: ' + e.message;
+    $('verdict').className = 'verdict no';
+  } finally {
+    $('run').disabled = false;
+  }
+});
+</script>

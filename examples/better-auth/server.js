@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { auth } from "./auth.js";
 import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { tideless } from "../shared/tideless.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -19,6 +20,8 @@ app.use(express.json());
 const pending = new Map();
 
 const session = (req) => auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+// A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
+app.use(tideless({ resolveUid: async (req) => (await session(req))?.user?.id, role: "vault-reader" }));
 
 const page = (body) => `<!doctype html><meta charset="utf-8">
 <style>

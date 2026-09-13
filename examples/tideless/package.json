@@ -1,0 +1,13 @@
+{
+  "name": "minidauth-tideless-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Encrypt, sign and decrypt for a user with no Tide account, against the live network",
+  "scripts": {
+    "roundtrip": "node --import ./register.mjs roundtrip.mjs"
+  },
+  "dependencies": {
+    "@tideorg/js": "0.14.25"
+  }
+}

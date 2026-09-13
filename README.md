@@ -134,6 +134,9 @@ Everything above runs against the public Tide network, not a simulator:
 - Sign-in, token minting with attested roles, key rotation and licensing.
 - A payment instruction signed by the cohort, and one over the policy's limit refused by fourteen
   nodes independently.
+- A **user with no Tide account** encrypting and decrypting a value end to end, authorised only by a
+  minidauth-issued voucher gated on a quorum-granted role, with no doken anywhere. See
+  [users without a Tide account](#users-without-a-tide-account) and [examples/tideless](examples/tideless).
 - [Supabase](examples/supabase) and [Clerk](examples/clerk) apps linking their users to Tide
   identities and reading authorisation from the quorum, both recorded step by step. Better Auth the
   same, locally. Auth0 and Cognito share their minidauth code but have not been run against real
@@ -255,6 +258,28 @@ putting roles in a token your own system can mint.
 
 Signing is not an endpoint you call. It happens inside the operations above: the token you receive,
 and the grants behind it, are already signed by a threshold of nodes.
+
+## Users without a Tide account
+
+Everything above links a Tide identity to each of your users. You do not have to. For users who
+should encrypt, sign or decrypt without their own Tide sign-in, minidauth acts on their behalf and
+the gate becomes a role you granted them through the quorum:
+
+| | |
+|---|---|
+| `POST /iga/change-requests/role` `{vuid, role, tideless: true}` | grant a role to an application user id (a Clerk uid, say), through the same file → approve → commit quorum. No attestation, since there is no identity to attest. |
+| `POST /vault/sign` `{uid, role, payload}` | minidauth checks the user's committed grant holds `role`, then has the cohort sign the payload. Returns an ordinary VVK signature anyone can verify. |
+| `POST /vault/voucher` `{uid, role, voucherRequest}` | issues a decrypt voucher only when the user holds `role`; the browser then runs the threshold decrypt with the voucher and no doken. |
+
+The trade this makes is explicit: **minidauth becomes the authority for these users' reads and
+signatures**, deciding from a quorum-approved record rather than the cohort checking a doken. The
+roles are still granted and revoked by the quorum, and the vendor key is still never assembled; what
+you give up is the per-request cryptographic proof that this specific user holds the role. Use it
+where a second login is not worth it and the app server is already trusted to say who is calling.
+
+This is proven end to end against the live network in [examples/tideless](examples/tideless), using
+the published `@tideorg/js` — no fork. The doken-less path uses the SDK's existing gSessKey mode; the
+only server addition is the two routes above.
 
 **Cognito.** Add `custom:tide_vuid` to the user pool and write the vuid there after sign-in. A Pre
 Token Generation trigger can copy the vuid into the token, but copy **only** the vuid. A role that

@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import crypto from "node:crypto";
 import * as supabase from "./supabase.js";
 import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { tideless } from "../shared/tideless.js";
 import { page, identityBlock } from "../shared/page.js";
 
 const app = express();
@@ -22,6 +23,8 @@ const pending = new Map();
 /* Supabase signs in from the browser, so the access token arrives in a cookie this app sets from
  * the client rather than in a session it created itself. */
 const userOf = (req) => supabase.userFor(req.cookies.sb).catch(() => null);
+// A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
+app.use(tideless({ resolveUid: async (req) => (await userOf(req))?.id, role: "vault-reader" }));
 
 app.get("/", async (req, res) => {
   const missing = supabase.missingConfig();

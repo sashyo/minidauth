@@ -69,3 +69,29 @@ http://localhost:8081/console.
 Encryption. That happens in the browser inside the Tide enclave, not in this app, so a fair example
 of it is a page of enclave plumbing rather than an integration. minidauth's own `/console/vault`
 does exactly that, and is the shorter way to see it work.
+
+
+## Tideless: encrypt & decrypt with no Tide account
+
+This example also mounts a **tideless** page at `/tideless` (see
+[`../shared/tideless.js`](../shared/tideless.js)). It is the opposite of linking a Tide identity: the
+signed-in Better Auth user encrypts and decrypts with **no Tide account and no doken**. Their own
+the Better Auth account id is the subject, and a role a quorum granted that id is the gate; minidauth issues the
+vouchers and the ORK cohort does the crypto. The browser holds no credential — the server proxies
+the vouchers and sets the uid from its own verified session, so a page cannot read as another user.
+
+Two prerequisites, both one-time:
+
+- minidauth must have a **PUBLIC** decrypt policy (voucher-gated, not doken-gated). A key's decrypt
+  policy is either PUBLIC or PRIVATE, so this is a different key/policy from the account-linked flow
+  above. See [docs/running.md](../../docs/running.md).
+- Grant the user's id a role as a tideless subject, through the quorum:
+
+  ```sh
+  curl -sX POST localhost:8081/iga/change-requests/role -H "Authorization: Bearer $ALICE" \
+    -H 'Content-Type: application/json' -d '{"vuid":"<better auth user id>","role":"vault-reader","tideless":true}'
+  # $BOB and $CAROL authorize, then commit
+  ```
+
+Then sign in and open `/tideless`. The trade this makes — minidauth becomes the authority for these
+users' reads — is spelled out in [examples/tideless](../tideless#the-trade-you-are-making).

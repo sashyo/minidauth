@@ -238,4 +238,47 @@ class RoleGrantTest {
         assertTrue( after.isEmpty(),
                 "nothing may remain that could be replayed to claim the revoked role" );
     }
+
+    // ---- tideless subjects: application users with no Tide identity ----
+
+    private ChangeRequest grantTideless( String subject, String role, boolean revoke ) {
+        ChangeRequest cr = gov.fileRoleChange( alice, subject, role, revoke, true );
+        gov.authorize( bob, cr.id );
+        gov.authorize( carol, cr.id );
+        return gov.commit( bob, cr.id );
+    }
+
+    @Test
+    void aTidelessRoleStillNeedsTheQuorum() {
+        ChangeRequest cr = gov.fileRoleChange( alice, "user_clerk_1", "vault-reader", false, true );
+        assertTrue( gov.rolesFor( "user_clerk_1" ).isEmpty(), "filing alone must grant nothing" );
+        gov.authorize( bob, cr.id );
+        assertTrue( gov.rolesFor( "user_clerk_1" ).isEmpty(), "below threshold grants nothing" );
+        gov.authorize( carol, cr.id );
+        gov.commit( bob, cr.id );
+        assertTrue( gov.rolesFor( "user_clerk_1" ).contains( "vault-reader" ) );
+    }
+
+    @Test
+    void aTidelessGrantAttestsNothing() {
+        grantTideless( "user_clerk_1", "vault-reader", false );
+        assertTrue( gov.signedRoleUnitsFor( "user_clerk_1" ).isEmpty(),
+                "a tideless subject has no identity to attest, so no units may exist to replay into a doken" );
+        assertTrue( store.grant( "user_clerk_1" ).tideless );
+    }
+
+    @Test
+    void theFilerStillCannotApproveATidelessGrant() {
+        ChangeRequest cr = gov.fileRoleChange( alice, "user_clerk_1", "vault-reader", false, true );
+        assertThrows( GovernanceException.class, () -> gov.authorize( alice, cr.id ),
+                "four-eyes holds for tideless grants too" );
+    }
+
+    @Test
+    void aSubjectCannotBeBothTideAndTideless() {
+        grant( "user_clerk_1", "vault-reader", false );
+        assertThrows( GovernanceException.class,
+                () -> gov.fileRoleChange( alice, "user_clerk_1", "vault-writer", false, true ),
+                "a subject enforced one way must not also be enforced the other" );
+    }
 }

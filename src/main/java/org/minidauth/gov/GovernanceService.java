@@ -197,22 +197,46 @@ public final class GovernanceService {
      * @param revoke true to take the role away instead of granting it
      */
     public synchronized ChangeRequest fileRoleChange(Operator by, String vuid, String role, boolean revoke) {
+        return fileRoleChange(by, vuid, role, revoke, false);
+    }
+
+    /**
+     * File a role grant or revocation, for a Tide identity or an application user.
+     *
+     * @param subject the subject the role is for: a Tide vuid when {@code tideless} is false, or an
+     *                application user id (e.g. a Clerk uid) when it is true
+     * @param tideless true when the subject has no Tide identity; the committed grant records the
+     *                 role but attests nothing, and it is enforced by this service rather than by a
+     *                 doken. See {@link RoleGrant#tideless}.
+     */
+    public synchronized ChangeRequest fileRoleChange(Operator by, String subject, String role,
+                                                     boolean revoke, boolean tideless) {
         by.require(Role.APPROVER);
-        if (vuid == null || vuid.isBlank()) throw GovernanceException.badRequest("vuid is required");
+        if (subject == null || subject.isBlank()) throw GovernanceException.badRequest("subject is required");
         if (role == null || role.isBlank()) throw GovernanceException.badRequest("role is required");
 
+        String cleanSubject = subject.trim();
         String cleanRole = role.trim();
-        boolean held = store.grant(vuid.trim()).roles.contains(cleanRole);
+        RoleGrant existing = store.grant(cleanSubject);
+        // A subject cannot be both a Tide identity and an application user: the two are enforced
+        // differently, so mixing them on one record would make "does it hold this role" ambiguous.
+        if (!existing.roles.isEmpty() && existing.tideless != tideless) {
+            throw GovernanceException.conflict(cleanSubject + " already holds roles as a "
+                    + (existing.tideless ? "tideless" : "Tide") + " subject; it cannot also be a "
+                    + (tideless ? "tideless" : "Tide") + " one");
+        }
+        boolean held = existing.roles.contains(cleanRole);
         if (revoke && !held) {
-            throw GovernanceException.conflict(vuid + " does not hold " + cleanRole);
+            throw GovernanceException.conflict(cleanSubject + " does not hold " + cleanRole);
         }
         if (!revoke && held) {
-            throw GovernanceException.conflict(vuid + " already holds " + cleanRole);
+            throw GovernanceException.conflict(cleanSubject + " already holds " + cleanRole);
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("vuid", vuid.trim());
+        payload.put("vuid", cleanSubject);
         payload.put("role", cleanRole);
+        if (tideless) payload.put("tideless", true);
         return file(by, revoke ? Kind.REVOKE_ROLE : Kind.GRANT_ROLE, payload);
     }
 
@@ -618,6 +642,7 @@ public final class GovernanceService {
     private String commitRoleChange(ChangeRequest cr, boolean revoke) {
         String vuid = (String) cr.payload.get("vuid");
         String role = (String) cr.payload.get("role");
+        boolean tideless = Boolean.TRUE.equals(cr.payload.get("tideless"));
 
         RoleGrant grant = store.grant(vuid);
         boolean held = grant.roles.contains(role);
@@ -628,6 +653,25 @@ public final class GovernanceService {
         if (!revoke && held) {
             throw GovernanceException.conflict(vuid + " already holds " + role
                     + "; another change request already granted it");
+        }
+
+        // A tideless subject has no identity to attest: the grant is the record, gated by the same
+        // operator quorum that authorized this request. Nothing goes to the network, and the empty
+        // signedUnits keep these roles out of any doken. This service enforces them when it signs
+        // for the user or vouchers a decrypt on their behalf.
+        if (tideless) {
+            java.util.LinkedHashSet<String> after = new java.util.LinkedHashSet<>(grant.roles);
+            if (revoke) after.remove(role); else after.add(role);
+            grant.roles.clear();
+            grant.roles.addAll(after);
+            grant.tideless = true;
+            grant.signedUnits = new java.util.ArrayList<>();
+            grant.changeRequestId = cr.id;
+            grant.updatedAt = Instant.now().toString();
+            store.putGrant(grant);
+            log.info("%s %s %s tideless subject %s", revoke ? "Revoked" : "Granted", role,
+                    revoke ? "from" : "to", vuid);
+            return vuid;
         }
 
         /* Work out the new role set without touching the stored one.
@@ -697,6 +741,12 @@ public final class GovernanceService {
         if (cr.kind != Kind.DEPLOY_POLICY && !roleChange) {
             throw GovernanceException.badRequest(
                     "Only a policy deployment or a role change is approved this way");
+        }
+
+        if (roleChange && Boolean.TRUE.equals(cr.payload.get("tideless"))) {
+            throw GovernanceException.badRequest(
+                    "This is a tideless role change: there is no identity to attest, so it takes no "
+                    + "enclave approval. Authorize it as an operator, then commit.");
         }
 
         if (cr.approvalCarrier == null || cr.approvalCarrier.isBlank()) {
@@ -792,6 +842,90 @@ public final class GovernanceService {
                         && p.modelIds.size() == 1
                         && ENCRYPT_MODEL.equals(p.modelIds.get(0)))
                 .findFirst();
+    }
+
+    /** Prefix of a custom-signing model, e.g. {@code BasicCustom<Payment>:BasicCustom<1>}. */
+    private static final String CUSTOM_MODEL_PREFIX = "BasicCustom<";
+
+    /**
+     * The deployed custom-signing policy, if one is deployed.
+     *
+     * <p>Recognised by carrying a {@code BasicCustom<...>} model and not demanding approvers, so a
+     * single sign can go through it. It is what {@link #signForSubject} signs under.
+     */
+    public synchronized java.util.Optional<DeployedPolicy> publicSignPolicy() {
+        return store.policies().stream()
+                .filter(p -> p.modelIds != null
+                        && p.modelIds.stream().anyMatch(m -> m.startsWith(CUSTOM_MODEL_PREFIX)))
+                .filter(p -> !"EXPLICIT".equals(p.approvalType))
+                .findFirst();
+    }
+
+    /** Whether a subject's committed grant holds a role. The gate for signing and vouchering. */
+    public synchronized boolean subjectHolds(String subject, String role) {
+        if (subject == null || role == null) return false;
+        return store.grant(subject.trim()).roles.contains(role.trim());
+    }
+
+    /**
+     * Sign a payload for a subject who has no Tide identity, on their behalf.
+     *
+     * <p>This is the executor path: rather than the subject proving who they are to the cohort with a
+     * doken, this service checks that their committed grant holds {@code role} and, if so, asks the
+     * cohort to sign. The authority over who may sign is therefore this service reading a
+     * quorum-approved record, not a doken. The signature that comes back is an ordinary VVK
+     * threshold signature anyone can verify with the vendor public key.
+     *
+     * <p>The draft is a single-field TideMemory over {@code payload}: a little-endian version {@code 1},
+     * a little-endian length, then the bytes. That is exactly what a verifier rebuilds, so the
+     * signature checks out against the payload alone. The custom policy's contract still runs on the
+     * cohort, so any payload rule it encodes (a payment limit, say) is enforced there too.
+     *
+     * @return the cohort's signature, base64
+     */
+    public synchronized String signForSubject(String subject, String role, byte[] payload) throws Exception {
+        if (payload == null || payload.length == 0) {
+            throw GovernanceException.badRequest("nothing to sign");
+        }
+        if (!subjectHolds(subject, role)) {
+            throw GovernanceException.forbidden(subject + " does not hold " + role
+                    + ", so this service will not sign for them");
+        }
+        DeployedPolicy policy = publicSignPolicy().orElseThrow(() -> GovernanceException.conflict(
+                "No custom-signing policy is deployed, so there is nothing to sign under"));
+        String model = policy.modelIds.stream()
+                .filter(m -> m.startsWith(CUSTOM_MODEL_PREFIX))
+                .findFirst()
+                .orElseThrow(() -> GovernanceException.conflict("Signing policy names no BasicCustom model"));
+        String[] parts = model.split(":", 2);
+        if (parts.length != 2) throw GovernanceException.conflict("Malformed signing model id " + model);
+
+        byte[] draft = tideMemory(payload);
+        byte[] policyBytes = Base64.getDecoder().decode(policy.policyBytes);
+        org.midgard.models.ModelRequest req =
+                org.midgard.models.ModelRequest.New(parts[0], parts[1], POLICY_AUTH_FLOW, draft, policyBytes);
+        // The creation authorization comes from the VRK, not from a doken: a PUBLIC policy runs no
+        // executor check, so no doken is needed, and this is what lets a subject with no Tide
+        // identity be signed for at all.
+        vrk.initializeRequestWithVrk(req);
+
+        var settings = vrk.store().midgardSettings();
+        settings.TraceParent = org.minidauth.vrk.Trace.current();
+        SignatureResponse resp = org.midgard.Midgard.SignModel(settings, req);
+        if (resp.Signatures == null || resp.Signatures.length == 0) {
+            throw new IllegalStateException("The Tide network returned no signature for " + model);
+        }
+        log.info("Signed a %s payload for tideless subject %s under %s", model, subject, role);
+        return resp.Signatures[0];
+    }
+
+    /** A single-field TideMemory: int32-LE version 1, int32-LE length, then the bytes. */
+    private static byte[] tideMemory(byte[] body) {
+        byte[] out = new byte[8 + body.length];
+        java.nio.ByteBuffer.wrap(out).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                .putInt(1).putInt(body.length);
+        System.arraycopy(body, 0, out, 8, body.length);
+        return out;
     }
 
     /**

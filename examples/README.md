@@ -16,6 +16,18 @@ being over the policy's limit, which is the part encryption cannot do.
 
 ![The demo](notes/docs/demo.gif)
 
+**[tideless](tideless)** is the other direction: encrypt, sign and decrypt for a user who has **no
+Tide account and no doken**. A quorum grants an app user id a role, and minidauth acts on their behalf,
+gating each operation on that role. Proven end to end against the live network. Use it for regular
+users who should not need a second login, while the accounts that read everyone's data keep real Tide
+identities.
+
+**[tideless-web](tideless-web)** is that same no-account flow in a real browser, click-through: a page
+that encrypts and decrypts with no doken, and a small server that proxies the vouchers so the browser
+never holds a credential.
+
+![tideless-web](tideless-web/docs/demo.png)
+
 ## Then the integrations
 
 Five auth systems, one integration. The point of having several is that the minidauth part does not
@@ -29,6 +41,12 @@ steps in each, with a different login provider:
 | [clerk](clerk) | :3003 | **Run end to end**, with a [walkthrough](clerk#what-it-looks-like) |
 | [auth0](auth0) | :3002 | **Run end to end**, with a [walkthrough](auth0#what-it-looks-like) |
 | [cognito](cognito) | :3001 | `npm run setup` builds the pool, but AWS wants a card |
+
+Each of these five also mounts a **`/tideless`** page — the same no-account encrypt/decrypt as
+[tideless-web](tideless-web), but with that provider's own login identifying the user. It shares one
+file, [`shared/tideless.js`](shared/tideless.js); only the "who is signed in" resolver differs per
+provider. See each example's README for the two prerequisites (a PUBLIC decrypt policy, and granting
+the user's id a tideless role).
 
 ## The pattern, in three steps
 

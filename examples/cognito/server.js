@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import crypto from "node:crypto";
 import * as cognito from "./cognito.js";
 import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { tideless } from "../shared/tideless.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -19,6 +20,8 @@ const sessions = new Map();
 const pending = new Map();
 
 const current = (req) => sessions.get(req.cookies.sid);
+// A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
+app.use(tideless({ resolveUid: async (req) => current(req)?.sub, role: "vault-reader" }));
 
 const page = (body) => `<!doctype html><meta charset="utf-8">
 <style>
