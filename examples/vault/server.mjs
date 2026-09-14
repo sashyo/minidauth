@@ -26,6 +26,11 @@ app.use(express.static(join(HERE, "public")));
 
 const userOf = (req) => db.userFor(req.cookies.sb).catch(() => null);
 
+// Supabase publishable config, so the browser can run its own sign-in (the access token comes back
+// in a cookie this app reads).
+app.get("/api/pubconfig", (_req, res) => res.json(db.publicConfig()));
+app.post("/api/logout", (_req, res) => { res.clearCookie("sb"); res.json({ ok: true }); });
+
 // Who is signed in, and what roles their id holds (read live from minidauth on every request).
 app.get("/api/session", async (req, res) => {
   const u = await userOf(req);

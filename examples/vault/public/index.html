@@ -327,6 +327,16 @@ tbody tr:hover{background:var(--surface2)}
   <div class="mf"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 12l3 3 5-6"/></svg>Encrypt &amp; save</button></div>
 </div></div>
 
+<div class="modal" id="loginModal"><div class="box" style="width:min(400px,100%)">
+  <div class="mh"><h3>Sign in to Vault</h3><p>Supabase login. No Tide account — your access comes from a role a quorum granted your user id.</p></div>
+  <div class="form">
+    <div class="inp"><label>Email</label><input id="l-email" type="email" placeholder="you@example.com" value="vault-demo@example.com"></div>
+    <div class="inp"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••"></div>
+    <div id="l-err" style="color:var(--danger);font-size:12.5px;min-height:16px"></div>
+  </div>
+  <div class="mf"><button class="btn" id="lCancel">Cancel</button><button class="btn primary" id="lGo">Sign in</button></div>
+</div></div>
+
 <div class="toasts" id="toasts"></div>
 <script type="module" src="./app.js"></script>
 </body>

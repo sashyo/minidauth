@@ -225,7 +225,29 @@ $('#q').oninput = e => renderRecords(e.target.value.toLowerCase());
 $('#newBtn').onclick = openModal; $('#mCancel').onclick = closeModal; $('#mSave').onclick = saveRecord;
 $('#modal').onclick = e => { if(e.target.id==='modal') closeModal(); };
 $('#theme').onclick = ()=>{ const b=document.body; b.dataset.theme = b.dataset.theme==='dark'?'light':'dark'; };
-document.onkeydown = e => { if(e.key==='Escape'){ closeDrawer(); closeModal(); } };
+document.onkeydown = e => { if(e.key==='Escape'){ closeDrawer(); closeModal(); $('#loginModal').classList.remove('on'); } };
+
+// ---- login (real Supabase) ----------------------------------------------
+async function doLogin(){
+  const email=$('#l-email').value.trim(), pass=$('#l-pass').value;
+  const go=$('#lGo'); $('#l-err').textContent=''; go.textContent='Signing in…';
+  try{
+    const {url,anonKey}=await fetch('/api/pubconfig').then(r=>r.json());
+    if(!url) throw new Error('Supabase is not configured on the server');
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const {data,error}=await createClient(url,anonKey).auth.signInWithPassword({email,password:pass});
+    if(error) throw error;
+    document.cookie='sb='+data.session.access_token+'; path=/; samesite=lax';
+    location.reload();
+  }catch(e){ $('#l-err').textContent=e.message||'sign-in failed'; go.textContent='Sign in'; }
+}
+$('#lGo').onclick=doLogin; $('#lCancel').onclick=()=>$('#loginModal').classList.remove('on');
+$('#loginModal').onclick=e=>{ if(e.target.id==='loginModal') e.currentTarget.classList.remove('on'); };
+$('#l-pass').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
+document.querySelector('.user').onclick=()=>{
+  if(LIVE){ if(confirm('Sign out?')){ fetch('/api/logout',{method:'POST'}).finally(()=>{document.cookie='sb=; path=/; max-age=0'; location.reload();}); } }
+  else { $('#loginModal').classList.add('on'); $('#l-pass').focus(); }
+};
 
 // ---- boot ----------------------------------------------------------------
 (async ()=>{
@@ -238,6 +260,10 @@ document.onkeydown = e => { if(e.key==='Escape'){ closeDrawer(); closeModal(); }
       $('#urole').textContent=(s.roles&&s.roles.length?s.roles.join(' · '):'no roles yet');
       const recs = await fetch('/api/vault/records').then(r=>r.json()).catch(()=>null);
       if(recs && recs.length) RECORDS = recs.map(r=>({...r, bankMask:'**• ••-'+(r.id||'').slice(-4), taxMask:'**• ••-'+(r.ref||'').slice(-4), fields:Object.keys(r.ct||{})}));
+    } else {
+      // demo: the chip becomes a sign-in affordance
+      $('#uname').textContent='Sign in'; $('#urole').textContent='demo mode'; $('#uav').textContent='→';
+      document.querySelector('.user').style.cursor='pointer';
     }
   }catch{}
   renderRecords(); renderReleases(); renderRaw();
