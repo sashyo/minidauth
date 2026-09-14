@@ -9,6 +9,12 @@ signed row in Supabase and it turns forged on the next load.
 
 ![The payouts demo](payouts/docs/demo.gif)
 
+**[vault](vault)** is the full app: a confidential client-records desk on Supabase. Sensitive fields
+are sealed in the browser via the Tide network, revealed only for a quorum-granted role, and releases
+are network-signed. It's **tideless** — no second login — and runs in demo mode with no setup.
+
+![Vault](vault/docs/demo.png)
+
 **[notes](notes)** is the smallest version of the same idea, with no login provider at all.
 Write a note and it is encrypted inside the enclave; the page then prints the database so you can see
 it holds nothing but ciphertext. It also asks the network to sign a payment and gets refused for
