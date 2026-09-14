@@ -63,3 +63,37 @@ export async function addRecord({ name, ref, ct, by }) {
   const row = must(await admin().from("vault_records").insert({ name, ref, ciphertext: ct, created_by: by }).select().single());
   return { id: row.id, name: row.name, ref: row.ref, ct: row.ciphertext ?? {}, created: row.created_at?.slice(0, 10) };
 }
+export async function updateRecord({ id, name, ref, ct }) {
+  const patch = {};
+  if (name != null) patch.name = name;
+  if (ref !== undefined) patch.ref = ref;
+  if (ct != null) patch.ciphertext = ct;
+  const row = must(await admin().from("vault_records").update(patch).eq("id", id).select().single());
+  return { id: row.id, name: row.name, ref: row.ref, ct: row.ciphertext ?? {}, created: row.created_at?.slice(0, 10) };
+}
+export async function deleteRecord(id) {
+  must(await admin().from("vault_records").delete().eq("id", id).select());
+  return { ok: true };
+}
+
+// -------------------------------------------------------------- activity
+// Append-only feed for the audit trail and access requests. All writes are best-effort: if the
+// table is not there yet, logging is skipped and the crypto path is never affected.
+export async function logActivity({ type, actor, actorEmail, allowed, detail }) {
+  try {
+    await admin().from("vault_activity").insert({ type, actor, actor_email: actorEmail ?? null, allowed: allowed ?? null, detail: detail ?? {} });
+  } catch { /* table may not exist yet */ }
+}
+export async function activity(limit = 100) {
+  try {
+    const rows = must(await admin().from("vault_activity").select("*").order("created_at", { ascending: false }).limit(limit));
+    return rows.map((r) => ({ id: r.id, type: r.type, actor: r.actor, email: r.actor_email, allowed: r.allowed, detail: r.detail ?? {}, at: r.created_at }));
+  } catch { return []; }
+}
+/** The caller's most recent open access request, if any (used to show a "pending" state). */
+export async function openAccessRequestFor(uid) {
+  try {
+    const rows = must(await admin().from("vault_activity").select("*").eq("type", "access_request").eq("actor", uid).order("created_at", { ascending: false }).limit(1));
+    return rows[0] ? { role: rows[0].detail?.role, at: rows[0].created_at } : null;
+  } catch { return null; }
+}

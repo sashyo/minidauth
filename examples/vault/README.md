@@ -22,8 +22,22 @@ subject, and a role a quorum granted it is the gate.
 - **Reads gated by a quorum-granted role, not by the app.** Revealing a field asks the server for a
   decrypt voucher, issued only if the signed-in user's id holds `vault-reader` — a role a quorum
   granted. The app cannot grant itself one.
+- **The threshold model, made visible.** Every seal and reveal shows the cohort responding in real
+  time — one dot per node, lit as each answers ("Sealed · 17 of 20 nodes signed"). No node holds the
+  key, and you can watch that be true.
+- **An audit trail.** Every seal, reveal, **denial** and access request is logged to an Activity feed
+  — the denials are the proof the gate bites.
+- **Request access in-app.** A user without the role clicks *Request access*; the app only **records**
+  the request (it never touches governance), and an administrator grants it through the quorum. It
+  takes effect on the next request.
+- **Reveals that re-lock.** A revealed value offers a copy button and re-hides after 15 seconds and
+  when the drawer closes. Records can be edited (fields are re-encrypted) and deleted.
 - **No second login.** All of it runs off the app's own session; the browser holds no extra
   credential.
+
+> The Activity feed and access requests use a `vault_activity` table. If you set the vault up before
+> that table existed, **re-run [`schema.sql`](schema.sql)** (it is `create table if not exists`, so it
+> is safe) — until then those two features are simply inert; everything else works.
 
 ## Security posture
 

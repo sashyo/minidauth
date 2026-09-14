@@ -227,6 +227,53 @@ tbody tr:hover{background:var(--surface2)}
 /* stats: three tiles */
 .stats-3{grid-template-columns:repeat(3,1fr)}
 
+/* access banner */
+.access-banner{display:flex;align-items:center;gap:14px;background:color-mix(in oklab,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in oklab,var(--accent) 38%,var(--border));border-radius:var(--r);padding:13px 16px;margin-bottom:20px;font-size:13px}
+.access-banner.pending{background:var(--surface2);border-color:var(--border2);color:var(--muted)}
+.access-banner span{flex:1}
+.access-banner .btn{flex:none}
+
+/* danger button */
+.btn.danger{color:var(--danger);border-color:color-mix(in oklab,var(--danger) 35%,var(--border))}
+.btn.danger:hover{background:color-mix(in oklab,var(--danger) 12%,transparent);border-color:var(--danger)}
+
+/* revealed-field actions */
+.fact{display:flex;align-items:center;gap:10px}
+.fact .copy{padding:5px 11px}
+.fact .relock{font-size:11px;color:var(--faint);font-family:var(--mono)}
+
+/* activity feed */
+.actlist{display:flex;flex-direction:column}
+.actrow{display:flex;align-items:center;gap:13px;padding:13px 18px;border-bottom:1px solid var(--border);font-size:13.5px}
+.actrow:last-child{border-bottom:none}
+.actrow .ai{width:18px;height:18px;flex:none}
+.actrow .ai.ok{color:var(--ok)}.actrow .ai.no{color:var(--danger)}.actrow .ai.info{color:var(--info)}
+.actrow .at{flex:1}.actrow .admut{color:var(--muted);font-family:var(--mono);font-size:12px}
+.actrow .awhen{color:var(--faint);font-size:12px;font-family:var(--mono)}
+.actempty{padding:40px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}
+.actempty code{font-family:var(--mono);font-size:12px;color:var(--accent)}
+
+/* cohort visualization */
+.cohort{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(16px);z-index:90;
+  background:var(--raised);border:1px solid var(--border2);border-radius:14px;padding:15px 18px 13px;min-width:288px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .22s,transform .22s}
+.cohort.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.cohort.done{border-color:color-mix(in oklab,var(--ok) 55%,var(--border2))}
+.cohort.fail{border-color:color-mix(in oklab,var(--danger) 55%,var(--border2))}
+.co-title{font-size:13px;font-weight:600;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.co-title::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);animation:copulse 1s infinite}
+.cohort.done .co-title::before{background:var(--ok);animation:none}
+.cohort.fail .co-title::before{background:var(--danger);animation:none}
+@keyframes copulse{0%,100%{opacity:1}50%{opacity:.3}}
+.co-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin-bottom:10px}
+.co-dot{width:14px;height:14px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);transition:.25s}
+.co-dot.ok{background:var(--ok);border-color:var(--ok);box-shadow:0 0 8px -1px var(--ok);transform:scale(1.06)}
+.co-dot.bad{background:var(--danger-dim);border-color:var(--danger)}
+.co-foot{display:flex;align-items:baseline;gap:9px}
+.co-count{font-family:var(--mono);font-weight:600;font-size:13px}
+.co-sub{font-size:11px;color:var(--faint)}
+
 /* sign-in gate */
 .gate{position:fixed;inset:0;z-index:100;display:none;place-items:center;padding:24px;
   background:radial-gradient(1200px 600px at 50% -10%,color-mix(in oklab,var(--accent) 12%,var(--bg)),var(--bg))}
@@ -251,6 +298,7 @@ tbody tr:hover{background:var(--surface2)}
       <div class="navlabel">Workspace</div>
       <button class="nav on" data-view="records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h8"/></svg>Records<span class="ct" id="ct-records">—</span></button>
       <button class="nav" data-view="raw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Raw store</button>
+      <button class="nav" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Activity</button>
       <div class="navlabel">Governance</div>
       <button class="nav" data-view="access"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Access &amp; roles</button>
     </nav>
@@ -271,6 +319,8 @@ tbody tr:hover{background:var(--surface2)}
     </div>
 
     <div class="scroll">
+      <div id="accessBanner" class="access-banner" hidden></div>
+
       <!-- RECORDS -->
       <section class="view on" data-view="records">
         <div class="stats stats-3">
@@ -286,6 +336,12 @@ tbody tr:hover{background:var(--surface2)}
       <section class="view" data-view="raw">
         <div class="shead"><h2>Raw store</h2><span class="sub">exactly what a database dump — or a stolen database key — returns</span></div>
         <div class="rawwrap"><pre id="rawpre"></pre></div>
+      </section>
+
+      <!-- ACTIVITY -->
+      <section class="view" data-view="activity">
+        <div class="shead"><h2>Activity</h2><span class="sub">the audit trail — every seal, reveal, denial and access request, newest first</span></div>
+        <div class="card"><div id="actlist" class="actlist"></div></div>
       </section>
 
       <!-- ACCESS -->
@@ -318,13 +374,13 @@ tbody tr:hover{background:var(--surface2)}
 
 <!-- modal -->
 <div class="modal" id="modal"><div class="box">
-  <div class="mh"><h3>New client record</h3><p>Fields marked <span style="color:var(--accent);font-weight:600">encrypted</span> are sealed in your browser before they are stored. The database only ever holds ciphertext.</p></div>
+  <div class="mh"><h3 id="modalTitle">New client record</h3><p id="modalSub">Fields marked <span style="color:var(--accent);font-weight:600">encrypted</span> are sealed in your browser before they are stored. The database only ever holds ciphertext.</p></div>
   <div class="form">
-    <div class="inp"><label>Client name</label><input id="f-name" placeholder="Northwind Traders"></div>
-    <div class="inp"><label>Reference</label><input id="f-ref" placeholder="NWT-0042"></div>
-    <div class="inp"><label>Tax ID <span class="enc">encrypted</span></label><input id="f-tax" placeholder="Kept from the database"></div>
-    <div class="inp"><label>Bank account <span class="enc">encrypted</span></label><input id="f-bank" placeholder="IBAN / account number"></div>
-    <div class="inp"><label>Private notes <span class="enc">encrypted</span></label><textarea id="f-notes" rows="2" placeholder="Anything a leak must not contain"></textarea></div>
+    <div class="inp"><label>Client name</label><input id="f-name" placeholder="Acme Holdings"></div>
+    <div class="inp"><label>Reference</label><input id="f-ref" placeholder="e.g. ACM-0042"></div>
+    <div class="inp"><label>Tax ID <span class="enc">encrypted</span></label><input id="f-tax" data-ph="Kept out of the database" placeholder="Kept out of the database"></div>
+    <div class="inp"><label>Bank account <span class="enc">encrypted</span></label><input id="f-bank" data-ph="IBAN / account number" placeholder="IBAN / account number"></div>
+    <div class="inp"><label>Private notes <span class="enc">encrypted</span></label><textarea id="f-notes" rows="2" data-ph="Anything a leak must not contain" placeholder="Anything a leak must not contain"></textarea></div>
   </div>
   <div class="mf"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 12l3 3 5-6"/></svg>Encrypt &amp; save</button></div>
 </div></div>
@@ -341,6 +397,13 @@ tbody tr:hover{background:var(--surface2)}
     </div>
     <button class="btn primary" id="gGo" style="width:100%;justify-content:center;margin-top:4px">Sign in</button>
   </div>
+</div>
+
+<!-- cohort visualization: nodes light up as they respond during seal / reveal -->
+<div class="cohort" id="cohort">
+  <div class="co-title">Contacting the cohort</div>
+  <div class="co-grid"></div>
+  <div class="co-foot"><span class="co-count">0 / 0</span><span class="co-sub">nodes responding · no single node holds the key</span></div>
 </div>
 
 <div class="toasts" id="toasts"></div>

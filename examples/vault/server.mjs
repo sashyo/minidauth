@@ -153,7 +153,8 @@ app.get("/api/session", async (req, res) => {
   const u = await resolveSession(req, res);
   if (!u) return res.status(401).json({ error: "not signed in" });
   const roles = await rolesFor(u.id).catch(() => []);
-  res.json({ user: u.email ?? u.id, uid: u.id, roles });
+  const pending = roles.includes(ROLE) ? null : await db.openAccessRequestFor(u.id);
+  res.json({ user: u.email ?? u.id, uid: u.id, roles, gateRole: ROLE, pendingRequest: pending });
 });
 
 // --- vault ----------------------------------------------------------------
@@ -163,17 +164,31 @@ app.get("/api/vault/config", authRequired, async (_req, res) => {
   catch (e) { res.status(502).json({ error: String(e.message || e) }); }
 });
 
+const auditDetail = (req) => {
+  const c = req.body?.context;
+  return c && typeof c === "object" ? { field: String(c.field ?? "").slice(0, 40), record: String(c.record ?? "").slice(0, 64) } : {};
+};
+
 // Encrypt voucher (vendorsign) — any signed-in user may seal a field.
 app.post("/api/vault/voucher/sign", authRequired, requireCsrf, cryptoLimit, async (req, res) => {
-  try { res.type("application/json").send(await signVoucher(req.body.voucherRequest)); }
-  catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+  try {
+    const out = await signVoucher(req.body.voucherRequest);
+    db.logActivity({ type: "seal", actor: req.user.id, actorEmail: req.user.email, allowed: true, detail: auditDetail(req) });
+    res.type("application/json").send(out);
+  } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
 });
 
 // Decrypt voucher (vendordecrypt) — gated on the user's id holding the role. The uid is taken from
-// the verified session here, never from the browser.
+// the verified session here, never from the browser. Every attempt is logged, allowed or denied.
 app.post("/api/vault/voucher/decrypt", authRequired, requireCsrf, cryptoLimit, async (req, res) => {
-  try { res.type("application/json").send(await decryptVoucher(req.user.id, ROLE, req.body.voucherRequest)); }
-  catch (e) { res.status(403).json({ error: "the network declined — " + String(e.message || e) }); }
+  try {
+    const out = await decryptVoucher(req.user.id, ROLE, req.body.voucherRequest);
+    db.logActivity({ type: "reveal", actor: req.user.id, actorEmail: req.user.email, allowed: true, detail: auditDetail(req) });
+    res.type("application/json").send(out);
+  } catch (e) {
+    db.logActivity({ type: "reveal_denied", actor: req.user.id, actorEmail: req.user.email, allowed: false, detail: auditDetail(req) });
+    res.status(403).json({ error: "the network declined — " + String(e.message || e) });
+  }
 });
 
 // Records — ciphertext in, ciphertext out. The plaintext only ever exists in a browser.
@@ -192,6 +207,48 @@ app.post("/api/vault/records", authRequired, requireCsrf, async (req, res) => {
   }
   try { res.json(await db.addRecord({ name: name.trim(), ref: ref?.trim() || null, ct: fields, by: req.user.id })); }
   catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+});
+
+const uuidRe = /^[0-9a-f-]{36}$/i;
+function validCt(ct) {
+  const fields = ct && typeof ct === "object" ? ct : {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (!["bank", "tax", "notes"].includes(k)) return `unknown field ${k}`;
+    if (typeof v !== "string" || v.length > 100000) return `field ${k} is not a valid ciphertext`;
+  }
+  return null;
+}
+
+// Edit a record. The browser re-encrypts changed fields and sends fresh ciphertext.
+app.put("/api/vault/records/:id", authRequired, requireCsrf, async (req, res) => {
+  if (!uuidRe.test(req.params.id)) return res.status(400).json({ error: "bad id" });
+  const { name, ref, ct } = req.body ?? {};
+  if (name != null && (typeof name !== "string" || !name.trim() || name.length > 200)) return res.status(400).json({ error: "name must be <=200 chars" });
+  const bad = ct != null ? validCt(ct) : null;
+  if (bad) return res.status(400).json({ error: bad });
+  try { res.json(await db.updateRecord({ id: req.params.id, name: name?.trim(), ref: ref == null ? undefined : (ref.trim() || null), ct })); }
+  catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+});
+
+// Delete a record.
+app.delete("/api/vault/records/:id", authRequired, requireCsrf, async (req, res) => {
+  if (!uuidRe.test(req.params.id)) return res.status(400).json({ error: "bad id" });
+  try { await db.deleteRecord(req.params.id); db.logActivity({ type: "delete", actor: req.user.id, actorEmail: req.user.email, allowed: true, detail: { record: req.params.id } }); res.json({ ok: true }); }
+  catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+});
+
+// The activity feed: the audit trail plus access requests, newest first.
+app.get("/api/vault/activity", authRequired, async (_req, res) => {
+  res.json(await db.activity(150));
+});
+
+// Request access. The app does NOT touch governance — it only records the request; an administrator
+// grants the role through the quorum. Once granted, it shows up on /api/session on the next request.
+app.post("/api/vault/request-access", authRequired, requireCsrf, rateLimit({ windowMs: 60 * 1000, max: 5 }), async (req, res) => {
+  const roles = await rolesFor(req.user.id).catch(() => []);
+  if (roles.includes(ROLE)) return res.json({ ok: true, alreadyHeld: true });
+  await db.logActivity({ type: "access_request", actor: req.user.id, actorEmail: req.user.email, allowed: null, detail: { role: ROLE } });
+  res.json({ ok: true, role: ROLE });
 });
 
 // SPA fallback for anything that is not an API route.
