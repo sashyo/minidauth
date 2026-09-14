@@ -13,16 +13,5 @@ create table if not exists public.vault_records (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.vault_releases (
-  id uuid primary key default gen_random_uuid(),
-  record_id uuid references public.vault_records(id) on delete set null,
-  amount integer not null check (amount > 0),
-  signature text not null,            -- the network's EdDSA signature over the instruction
-  status text not null default 'signed',
-  requested_by uuid not null references auth.users(id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
-alter table public.vault_records  enable row level security;
-alter table public.vault_releases enable row level security;
-grant all on public.vault_records, public.vault_releases to service_role;
+alter table public.vault_records enable row level security;
+grant all on public.vault_records to service_role;

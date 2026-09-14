@@ -224,11 +224,24 @@ tbody tr:hover{background:var(--surface2)}
 .toast.ok .ti{color:var(--ok)}.toast.no .ti{color:var(--danger)}.toast.info .ti{color:var(--info)}
 .toast .tt{font-size:13px}.toast .tt b{font-weight:600}.toast .tt span{display:block;color:var(--muted);font-size:12px}
 
-@media(max-width:900px){.app{grid-template-columns:1fr}aside{display:none}.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.search{display:none}}
+/* stats: three tiles */
+.stats-3{grid-template-columns:repeat(3,1fr)}
+
+/* sign-in gate */
+.gate{position:fixed;inset:0;z-index:100;display:none;place-items:center;padding:24px;
+  background:radial-gradient(1200px 600px at 50% -10%,color-mix(in oklab,var(--accent) 12%,var(--bg)),var(--bg))}
+.gate.on{display:grid}
+.gatebox{background:var(--surface);border:1px solid var(--border2);border-radius:18px;width:min(400px,100%);
+  padding:28px 28px 26px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:16px;
+  animation:pop .3s cubic-bezier(.2,.8,.2,1)}
+.gatebrand{display:flex;align-items:center;gap:11px}
+.gatesub{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+
+@media(max-width:900px){.app{grid-template-columns:1fr}aside{display:none}.stats,.stats-3{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.search{display:none}}
 </style>
 </head>
 <body data-theme="dark">
-<div class="app">
+<div class="app" id="app" style="visibility:hidden">
   <aside>
     <div class="brand">
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V17"/></svg></div>
@@ -237,14 +250,13 @@ tbody tr:hover{background:var(--surface2)}
     <nav>
       <div class="navlabel">Workspace</div>
       <button class="nav on" data-view="records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h8"/></svg>Records<span class="ct" id="ct-records">—</span></button>
-      <button class="nav" data-view="releases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-9 9-5.5-1.5-9-4-9-9V6l9-3 9 3z"/></svg>Releases<span class="ct" id="ct-rel">—</span></button>
       <button class="nav" data-view="raw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Raw store</button>
       <div class="navlabel">Governance</div>
       <button class="nav" data-view="access"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Access &amp; roles</button>
     </nav>
     <div class="spacer"></div>
     <div class="side-foot">
-      <div class="callout"><span class="dot"></span><b>Live network</b><br>Keys are held across the Tide ORK cohort. This app never sees one whole.</div>
+      <div class="callout"><span class="dot"></span><b>Live network</b><br>Keys are held across a distributed cohort. This app never sees one whole.</div>
     </div>
   </aside>
 
@@ -254,34 +266,25 @@ tbody tr:hover{background:var(--surface2)}
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="q" placeholder="Search records…"></div>
       <div class="right">
         <button class="iconbtn" id="theme" title="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg></button>
-        <div class="user"><div class="avatar" id="uav">MA</div><div class="who"><b id="uname">m. archer</b><span id="urole">vault-reader · signer</span></div></div>
+        <div class="user" id="userChip" title="Sign out" style="cursor:pointer"><div class="avatar" id="uav">··</div><div class="who"><b id="uname">—</b><span id="urole">—</span></div></div>
       </div>
     </div>
 
     <div class="scroll">
-      <div id="demoBanner" class="demo-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span><b>Demo data.</b> Not signed in to Supabase — showing example records so you can explore the UI. Reveal and sign are simulated here; wired to the live network when configured.</span></div>
-
       <!-- RECORDS -->
       <section class="view on" data-view="records">
-        <div class="stats">
-          <div class="tile accent"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>Records</div><div class="v" id="s-rec">18</div><svg class="spark" width="60" height="26" viewBox="0 0 60 26"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,20 12,16 24,18 36,9 48,12 60,4"/></svg></div>
-          <div class="tile"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Encrypted fields</div><div class="v" id="s-enc">54</div></div>
-          <div class="tile"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>Signed releases</div><div class="v" id="s-sign">7</div></div>
-          <div class="tile"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Your roles</div><div class="v" style="font-size:15px;font-weight:700;padding-top:12px"><span class="chip ok"><span class="d"></span>vault-reader</span></div></div>
+        <div class="stats stats-3">
+          <div class="tile accent"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>Records</div><div class="v" id="s-rec">0</div><svg class="spark" width="60" height="26" viewBox="0 0 60 26"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,20 12,16 24,18 36,9 48,12 60,4"/></svg></div>
+          <div class="tile"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Encrypted fields</div><div class="v" id="s-enc">0</div></div>
+          <div class="tile"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Your roles</div><div class="v" style="font-size:15px;font-weight:700;padding-top:12px"><span id="uroleChip" class="chip"><span class="d"></span>—</span></div></div>
         </div>
         <div class="shead"><h2>Client records</h2><span class="sub">sensitive fields encrypted before they ever reach the database</span><div class="act"><button class="btn primary" id="newBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>New record</button></div></div>
-        <div class="card"><table><thead><tr><th>Client</th><th>Tax ID</th><th>Bank</th><th>Fields</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
-      </section>
-
-      <!-- RELEASES -->
-      <section class="view" data-view="releases">
-        <div class="shead"><h2>Signed releases</h2><span class="sub">an action is real only if the network signed it — verifiable by anyone with the public key</span></div>
-        <div class="card"><table><thead><tr><th>Reference</th><th>Client</th><th>Amount</th><th>Requested</th><th>Signature</th></tr></thead><tbody id="relrows"></tbody></table></div>
+        <div class="card"><table><thead><tr><th>Client</th><th>Fields</th><th>Created</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       </section>
 
       <!-- RAW -->
       <section class="view" data-view="raw">
-        <div class="shead"><h2>Raw store</h2><span class="sub">exactly what a database dump — or a stolen service-role key — returns</span></div>
+        <div class="shead"><h2>Raw store</h2><span class="sub">exactly what a database dump — or a stolen database key — returns</span></div>
         <div class="rawwrap"><pre id="rawpre"></pre></div>
       </section>
 
@@ -292,9 +295,7 @@ tbody tr:hover{background:var(--surface2)}
           <div class="panel">
             <h3>Roles the network enforces</h3>
             <p>A role reaches you only through a change request a quorum approved. This app cannot grant one to itself.</p>
-            <div class="rolerow"><span class="chip ok"><span class="d"></span>vault-reader</span><div><div class="rn">decrypt client fields</div><div class="rd">held by you · granted by quorum</div></div></div>
-            <div class="rolerow"><span class="chip enc">signer</span><div><div class="rn">request network-signed releases</div><div class="rd">held by you</div></div></div>
-            <div class="rolerow"><span class="chip">vault-admin</span><div><div class="rn">manage records</div><div class="rd">not held</div></div></div>
+            <div id="roleList"></div>
           </div>
           <div class="panel">
             <h3>Granting someone access</h3>
@@ -317,7 +318,7 @@ tbody tr:hover{background:var(--surface2)}
 
 <!-- modal -->
 <div class="modal" id="modal"><div class="box">
-  <div class="mh"><h3>New client record</h3><p>Fields marked <span style="color:var(--accent);font-weight:600">encrypted</span> are sealed in your browser via the Tide network before they are stored. The database only ever holds ciphertext.</p></div>
+  <div class="mh"><h3>New client record</h3><p>Fields marked <span style="color:var(--accent);font-weight:600">encrypted</span> are sealed in your browser before they are stored. The database only ever holds ciphertext.</p></div>
   <div class="form">
     <div class="inp"><label>Client name</label><input id="f-name" placeholder="Northwind Traders"></div>
     <div class="inp"><label>Reference</label><input id="f-ref" placeholder="NWT-0042"></div>
@@ -328,15 +329,19 @@ tbody tr:hover{background:var(--surface2)}
   <div class="mf"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 12l3 3 5-6"/></svg>Encrypt &amp; save</button></div>
 </div></div>
 
-<div class="modal" id="loginModal"><div class="box" style="width:min(400px,100%)">
-  <div class="mh"><h3>Sign in to Vault</h3><p>Supabase login. No Tide account — your access comes from a role a quorum granted your user id.</p></div>
-  <div class="form">
-    <div class="inp"><label>Email</label><input id="l-email" type="email" placeholder="you@example.com" value="vault-demo@example.com"></div>
-    <div class="inp"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••"></div>
-    <div id="l-err" style="color:var(--danger);font-size:12.5px;min-height:16px"></div>
+<!-- sign-in gate: shown until a Supabase session exists; the app stays hidden behind it -->
+<div class="gate" id="gate">
+  <div class="gatebox">
+    <div class="gatebrand"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V17"/></svg></div><div class="n">Vault<small>minidauth</small></div></div>
+    <p class="gatesub">Sign in with your account. What you may decrypt comes from a role a quorum granted your user id — not from anything this app can give itself.</p>
+    <div class="form" style="padding:0">
+      <div class="inp"><label>Email</label><input id="g-email" type="email" autocomplete="username" placeholder="you@example.com"></div>
+      <div class="inp"><label>Password</label><input id="g-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+      <div id="g-err" style="color:var(--danger);font-size:12.5px;min-height:16px"></div>
+    </div>
+    <button class="btn primary" id="gGo" style="width:100%;justify-content:center;margin-top:4px">Sign in</button>
   </div>
-  <div class="mf"><button class="btn" id="lCancel">Cancel</button><button class="btn primary" id="lGo">Sign in</button></div>
-</div></div>
+</div>
 
 <div class="toasts" id="toasts"></div>
 <script type="module" src="./app.js"></script>
