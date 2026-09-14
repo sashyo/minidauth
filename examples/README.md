@@ -112,7 +112,7 @@ The shared client picks that up on its own and signs a fresh assertion per call 
 assertion observed in transit is worth nothing. A copy of minidauth's operators file is worth nothing
 either, because a public key cannot be presented as a credential.
 
-## The mistake all four are written to avoid
+## The mistake all five are written to avoid
 
 Every one of these systems will happily put custom claims in a token. Auth0 has Actions, Clerk has
 session token metadata, Supabase puts `app_metadata` straight into the JWT, Better Auth has
