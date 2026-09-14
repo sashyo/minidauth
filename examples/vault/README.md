@@ -13,6 +13,7 @@ subject, and a role a quorum granted it is the gate.
 |---|---|
 | The cohort responding, live, during a seal | ![cohort](docs/cohort.png) |
 | Reveal a field | ![reveal](docs/reveal.png) |
+| The audit trail — including denials | ![activity](docs/activity.png) |
 | What the database actually holds | ![raw](docs/raw.png) |
 
 ## What it shows
