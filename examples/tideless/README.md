@@ -17,6 +17,19 @@ no-account user:
   no doken
 - the cohort does the threshold crypto; the vendor key is never assembled
 
+## Tamper-evident grants (optional, stronger)
+
+By default a tideless grant is a plain governed record. If you deploy the **role-grants** policy
+(EXPLICIT, `AttestationUnit:1`), tideless grants become **cohort-signed**: committing one requires a
+Tide administrator to approve it in their enclave, and the cohort signs `role_definition` /
+`user_role_mapping_set` units keyed on the app uid. minidauth then **verifies those signatures
+against the vendor key before it issues a decrypt or sign voucher** — so editing the grant record to
+add a role grants nothing (the forged role has no cohort signature and is refused). This is proven
+end to end: a hand-edited role is rejected with `carries signed units but none attest role …`.
+
+It hardens the *record* (a stolen backup, a rogue write) — not a compromised minidauth *process*,
+which holds the vendor key. That residual gap needs the ORK-side identity fix; see the design notes.
+
 ## The trade you are making
 
 minidauth becomes the **authority** for these users' reads and signatures: it decides from a

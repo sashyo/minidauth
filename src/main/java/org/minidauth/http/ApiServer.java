@@ -454,7 +454,7 @@ public final class ApiServer implements AutoCloseable {
         router.post("/vault/voucher", (ex, p) -> {
             authenticate(ex);
             Map<String, Object> body = Json.readBody(ex);
-            if (!gov.subjectHolds(Json.requireString(body, "uid"), Json.requireString(body, "role"))) {
+            if (!gov.attestedHolds(Json.requireString(body, "uid"), Json.requireString(body, "role"))) {
                 throw new Json.HttpError(403, Json.requireString(body, "uid")
                         + " does not hold " + Json.requireString(body, "role")
                         + ", so this service will not voucher a decrypt for them");
