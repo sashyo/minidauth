@@ -395,8 +395,18 @@ public final class ApiServer implements AutoCloseable {
             /* Two ways in. An operator, as before, or a sign-in this service started, which is how
              * the enclave gets here: it runs in the user's browser and has no credential to
              * present. Anything else is turned away, because issuing a voucher spends the VRK and
-             * draws on the licence's account quota. */
-            if (!isLiveSignInSession(Router.query(ex).get("session"))) {
+             * draws on the licence's account quota.
+             *
+             * On the session lane every voucher is claimed against that session's budget and the
+             * service-wide ceiling, so a guessed or observed session id cannot spend the licence
+             * down. A non-live session falls through to the operator lane exactly as before. */
+            String session = Router.query(ex).get("session");
+            if (signIns.isLive(session)) {
+                if (!signIns.claimVoucher(session)) {
+                    throw new Json.HttpError(429,
+                            "voucher quota for this sign-in is exhausted, or the service is over its rate ceiling");
+                }
+            } else {
                 authenticate(ex);
             }
             Json.sendRaw(ex, 200,
@@ -671,40 +681,20 @@ public final class ApiServer implements AutoCloseable {
      * would turn this into an open redirector for a Tide sign-in, which is the one thing the signed
      * redirect URI exists to prevent.
      */
-    /* Sign-in sessions this service started, and when they expire.
+    /* Sign-in sessions this service started, gating and budgeting voucher issuance.
      *
-     * Their only job is to gate voucher issuance. A voucher costs the VRK and draws on the
-     * licence's account quota, so the endpoint cannot simply be open; but the enclave fetching one
-     * runs in the user's browser and has no operator credential to present. Recording the session
-     * when the login URL is built means the endpoint can tell a sign-in this service started from
-     * an anonymous caller, without the enclave having to carry anything extra.
+     * A voucher costs the VRK and draws on the licence's account quota, so the endpoint cannot simply
+     * be open; but the enclave fetching one runs in the user's browser with no operator credential to
+     * present. Recording the session when the login URL is built lets the endpoint tell a sign-in this
+     * service started from an anonymous caller. {@link SignInSessions} bounds what any one session can
+     * spend, and the service as a whole, so a guessed or observed session id cannot burn the licence.
      *
-     * In memory on purpose. A session outliving a restart buys nothing: the sign-in it belongs to
-     * is over long before. */
-    private final Map<String, Long> signInSessions = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private static final long SESSION_TTL_MS = 10 * 60 * 1000L;
-    private static final int MAX_SESSIONS = 10_000;
+     * In memory on purpose. A session outliving a restart buys nothing: the sign-in it belongs to is
+     * over long before. */
+    private final SignInSessions signIns = new SignInSessions();
 
     private void rememberSignInSession(String sessionId) {
-        long now = System.currentTimeMillis();
-        signInSessions.values().removeIf(expiry -> expiry < now);
-        // A cap rather than an eviction policy: this is a bound on memory, not a cache.
-        if (signInSessions.size() >= MAX_SESSIONS) {
-            throw new Json.HttpError(503, "Too many sign-ins in flight; try again shortly");
-        }
-        signInSessions.put(sessionId, now + SESSION_TTL_MS);
-    }
-
-    private boolean isLiveSignInSession(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) return false;
-        Long expiry = signInSessions.get(sessionId);
-        if (expiry == null) return false;
-        if (expiry < System.currentTimeMillis()) {
-            signInSessions.remove(sessionId);
-            return false;
-        }
-        return true;
+        signIns.remember(sessionId);
     }
 
     /**
