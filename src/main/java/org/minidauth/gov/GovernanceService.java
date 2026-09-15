@@ -655,11 +655,11 @@ public final class GovernanceService {
                     + "; another change request already granted it");
         }
 
-        // A tideless subject has no identity to attest: the grant is the record, gated by the same
-        // operator quorum that authorized this request. Nothing goes to the network, and the empty
-        // signedUnits keep these roles out of any doken. This service enforces them when it signs
-        // for the user or vouchers a decrypt on their behalf.
-        if (tideless) {
+        // A tideless subject with no role-signing policy deployed: the grant is a plain record,
+        // gated by the operator quorum that authorized this request. This is the lean fallback. When
+        // a role-grants policy IS deployed, tideless grants fall through to the attestation path
+        // below and become cohort-signed and tamper-evident, exactly like a Tide identity's roles.
+        if (tideless && rolePolicy().isEmpty()) {
             java.util.LinkedHashSet<String> after = new java.util.LinkedHashSet<>(grant.roles);
             if (revoke) after.remove(role); else after.add(role);
             grant.roles.clear();
@@ -706,12 +706,14 @@ public final class GovernanceService {
         grant.roles.clear();
         grant.roles.addAll(target);
         grant.signedUnits = signed;
+        grant.tideless = tideless;   // a tideless subject that reached here is now cohort-attested
 
         grant.changeRequestId = cr.id;
         grant.updatedAt = Instant.now().toString();
         store.putGrant(grant);
 
-        log.info("%s %s %s %s", revoke ? "Revoked" : "Granted", role, revoke ? "from" : "to", vuid);
+        log.info("%s %s %s %s%s", revoke ? "Revoked" : "Granted", role, revoke ? "from" : "to", vuid,
+                tideless ? " (tideless, cohort-attested)" : "");
         return vuid;
     }
 
@@ -743,10 +745,13 @@ public final class GovernanceService {
                     "Only a policy deployment or a role change is approved this way");
         }
 
-        if (roleChange && Boolean.TRUE.equals(cr.payload.get("tideless"))) {
+        // A tideless role change with no role-signing policy takes no enclave approval (it commits
+        // as a plain record). With one deployed, it builds a carrier and is approved like any other
+        // role grant, so its units are cohort-signed.
+        if (roleChange && Boolean.TRUE.equals(cr.payload.get("tideless")) && rolePolicy().isEmpty()) {
             throw GovernanceException.badRequest(
-                    "This is a tideless role change: there is no identity to attest, so it takes no "
-                    + "enclave approval. Authorize it as an operator, then commit.");
+                    "This is a tideless role change and no role-signing policy is deployed, so there "
+                    + "is nothing to attest. Authorize it as an operator, then commit.");
         }
 
         if (cr.approvalCarrier == null || cr.approvalCarrier.isBlank()) {
@@ -868,6 +873,59 @@ public final class GovernanceService {
     }
 
     /**
+     * Whether a subject holds a role, backed by a signature the cohort produced — not just this
+     * service's record.
+     *
+     * <p>This is the gate for a tideless decrypt or sign. When the grant carries cohort-signed
+     * attestation units (a role-grants policy was deployed at grant time), the role only counts if
+     * every unit's signature verifies against the vendor public key and one of the verified units
+     * names the role. So editing the grant record to add a role, or altering a signed unit, is
+     * refused here — the roles become tamper-evident rather than this service's word.
+     *
+     * <p>A grant with no signed units is the lean fallback (no role-signing policy was available):
+     * it falls back to the plain record, which is the pre-attestation behaviour.
+     */
+    public synchronized boolean attestedHolds(String subject, String role) {
+        if (subject == null || role == null) return false;
+        String s = subject.trim(), r = role.trim();
+        RoleGrant grant = store.grant(s);
+        if (!grant.roles.contains(r)) return false;
+        if (grant.signedUnits == null || grant.signedUnits.isEmpty()) return true; // lean fallback
+
+        String gvvk = vrk.store().get(org.minidauth.store.VendorKeyStore.VVK_PUBLIC);
+        if (gvvk == null || gvvk.isBlank()) return false;
+        java.security.PublicKey key;
+        try { key = ed25519PublicKey(gvvk); } catch (Exception e) { return false; }
+
+        boolean names = false;
+        for (RoleGrant.SignedUnit u : grant.signedUnits) {
+            byte[] unit, sig;
+            try { unit = Base64.getDecoder().decode(u.unit); sig = Base64.getDecoder().decode(u.signature); }
+            catch (Exception e) { return false; }
+            if (!ed25519Verify(key, unit, sig)) {
+                log.warn("Tamper refused: a signed unit on %s did not verify against the vendor key", s);
+                return false;
+            }
+            if (new String(unit, java.nio.charset.StandardCharsets.UTF_8).contains(r)) names = true;
+        }
+        if (!names) log.warn("Refused: %s carries signed units but none attest role %s", s, r);
+        return names;
+    }
+
+    /** An Ed25519 public key from 32 bytes of hex (the vendor public point), wrapped as SPKI. */
+    private static java.security.PublicKey ed25519PublicKey(String hex32) throws Exception {
+        byte[] spki = java.util.HexFormat.of().parseHex("302a300506032b6570032100" + hex32.trim());
+        return java.security.KeyFactory.getInstance("Ed25519")
+                .generatePublic(new java.security.spec.X509EncodedKeySpec(spki));
+    }
+    private static boolean ed25519Verify(java.security.PublicKey key, byte[] msg, byte[] sig) {
+        try {
+            java.security.Signature v = java.security.Signature.getInstance("Ed25519");
+            v.initVerify(key); v.update(msg); return v.verify(sig);
+        } catch (Exception e) { return false; }
+    }
+
+    /**
      * Sign a payload for a subject who has no Tide identity, on their behalf.
      *
      * <p>This is the executor path: rather than the subject proving who they are to the cohort with a
@@ -887,7 +945,7 @@ public final class GovernanceService {
         if (payload == null || payload.length == 0) {
             throw GovernanceException.badRequest("nothing to sign");
         }
-        if (!subjectHolds(subject, role)) {
+        if (!attestedHolds(subject, role)) {
             throw GovernanceException.forbidden(subject + " does not hold " + role
                     + ", so this service will not sign for them");
         }

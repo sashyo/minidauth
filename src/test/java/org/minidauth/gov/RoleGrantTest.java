@@ -275,6 +275,28 @@ class RoleGrantTest {
     }
 
     @Test
+    void attestedHoldsFallsBackToTheRecordForALeanGrant() {
+        grantTideless( "user_clerk_1", "vault-reader", false );
+        // No role-signing policy in this harness, so the grant is lean (no signed units): the gate
+        // falls back to the record.
+        assertTrue( gov.attestedHolds( "user_clerk_1", "vault-reader" ) );
+        assertFalse( gov.attestedHolds( "user_clerk_1", "vault-writer" ) );
+    }
+
+    @Test
+    void attestedHoldsRefusesUnverifiableSignedUnits() {
+        // A grant that carries signed units whose signatures do not verify against the vendor key is
+        // tamper-evident: the role is refused rather than trusted.
+        RoleGrant g = new RoleGrant( "user_clerk_2" );
+        g.tideless = true;
+        g.roles.add( "vault-reader" );
+        g.signedUnits.add( new RoleGrant.SignedUnit( "dW5pdA==", "c2ln" ) ); // "unit"/"sig", not a real cohort signature
+        store.putGrant( g );
+        assertFalse( gov.attestedHolds( "user_clerk_2", "vault-reader" ),
+                "signed units that do not verify against the vendor key must not grant access" );
+    }
+
+    @Test
     void aSubjectCannotBeBothTideAndTideless() {
         grant( "user_clerk_1", "vault-reader", false );
         assertThrows( GovernanceException.class,

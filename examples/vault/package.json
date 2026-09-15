@@ -1,0 +1,12 @@
+{
+  "name": "minidauth-vault",
+  "private": true,
+  "type": "module",
+  "description": "A confidential client-records vault on Supabase + minidauth, tideless (no second login)",
+  "scripts": { "start": "node --env-file-if-exists=.env server.mjs" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2"
+  }
+}

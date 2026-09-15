@@ -1,9 +1,9 @@
 import express from "express";
-import crypto from "node:crypto";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { auth } from "./auth.js";
-import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { rolesFor } from "../shared/minidauth.js";
 import { tideless } from "../shared/tideless.js";
+import { link } from "../shared/link.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -13,15 +13,17 @@ const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`;
 app.all("/api/auth/*", toNodeHandler(auth));
 app.use(express.json());
 
-/* Sign-ins in flight, by the id the enclave echoes back.
- *
- * In memory because they live for one redirect. Each one remembers which logged-in account started
- * the link, so the reply can only ever attach to that account. */
-const pending = new Map();
-
 const session = (req) => auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
 // A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
 app.use(tideless({ resolveUid: async (req) => (await session(req))?.user?.id, role: "vault-reader" }));
+// Link a Tide identity to the signed-in user (see ../shared/link.js). onLinked writes the vuid to the
+// Better Auth user, identified from the request's own session.
+app.use(link({
+  resolveUser: async (req) => { const s = await session(req); return s ? { id: s.user.id } : null; },
+  onLinked: async ({ req, vuid }) => { await auth.api.updateUser({ body: { tideVuid: vuid }, headers: fromNodeHeaders(req.headers) }); },
+  appUrl: APP_URL,
+  afterLink: "/",
+}));
 
 const page = (body) => `<!doctype html><meta charset="utf-8">
 <style>
@@ -75,47 +77,6 @@ app.post("/signup", express.urlencoded({ extended: false }), async (req, res) =>
   res.redirect("/");
 });
 
-/* Start the link. The browser goes to the enclave, not to us and not to minidauth. */
-app.get("/tide/link", async (req, res) => {
-  const s = await session(req);
-  if (!s) return res.redirect("/");
-
-  const sessionId = "app-" + crypto.randomUUID();
-  pending.set(s.user.id, { sessionId, at: Date.now() });
-  try {
-    res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
-  } catch (e) {
-    res.status(502).send(page(`<h1>Could not start the sign-in</h1><p>${e.message}</p>`));
-  }
-});
-
-/* The enclave comes back here.
- *
- * The proof is verified by minidauth, so the vuid is proven rather than claimed. What this app
- * still has to get right is that the reply belongs to the sign-in it started, for the account that
- * started it, which is what the pending map is for. */
-app.get("/tide/callback", async (req, res) => {
-  // The enclave calls it vendorEncryptedData, and sends back no session id of its own.
-  const data = req.query.vendorEncryptedData;
-  const s = await session(req);
-  const started = s ? pending.get(s.user.id) : null;
-  if (s) pending.delete(s.user.id);
-
-  if (!data || !started) {
-    return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
-  }
-
-  try {
-    const { vuid } = await completeLogin(String(data), started.sessionId);
-    await auth.api.updateUser({
-      body: { tideVuid: vuid },
-      headers: fromNodeHeaders(req.headers),
-    });
-    res.redirect("/");
-  } catch (e) {
-    res.status(502).send(page(`<h1>Sign-in could not be verified</h1><p>${e.message}</p>`));
-  }
-});
 
 /* The whole point, in one route.
  *
