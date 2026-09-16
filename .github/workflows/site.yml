@@ -24,4 +24,3 @@ jobs:
           app_location: site      # the site is plain static files
           output_location: ""     # nothing to build
           skip_app_build: true
-          skip_api_build: true
