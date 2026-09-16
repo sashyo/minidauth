@@ -2,8 +2,9 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import crypto from "node:crypto";
 import * as auth0 from "./auth0.js";
-import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { rolesFor } from "../shared/minidauth.js";
 import { tideless } from "../shared/tideless.js";
+import { link } from "../shared/link.js";
 import { page, identityBlock } from "../shared/page.js";
 
 const app = express();
@@ -17,6 +18,21 @@ const pending = new Map();
 const current = (req) => sessions.get(req.cookies.sid);
 // A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
 app.use(tideless({ resolveUid: async (req) => current(req)?.sub, role: "vault-reader" }));
+// Link a Tide identity to the signed-in user (see ../shared/link.js). onLinked, because Auth0 keeps
+// the vuid in this in-memory session and only best-effort writes it to app_metadata.
+app.use(link({
+  resolveUser: (req) => { const s = current(req); return s ? { id: s.sub } : null; },
+  onLinked: async ({ req, vuid }) => {
+    const s = current(req);
+    if (!s) return;
+    s.vuid = vuid;
+    // Persisting needs the Management API with update:users; without it the link lives in this session.
+    try { await auth0.storeVuid(s.sub, vuid); s.persisted = true; }
+    catch (e) { s.persisted = false; s.persistError = e.message; console.log("could not persist the vuid to Auth0:", e.message); }
+  },
+  appUrl: APP_URL,
+  afterLink: "/",
+}));
 
 app.get("/", async (req, res) => {
   const missing = auth0.missingConfig();
@@ -69,52 +85,6 @@ app.get("/callback", async (req, res) => {
     res.redirect("/");
   } catch (e) {
     res.status(502).send(page(`<h1>Auth0 sign-in failed</h1><p>${e.message}</p>`));
-  }
-});
-
-app.get("/tide/link", async (req, res) => {
-  const s = current(req);
-  if (!s) return res.redirect("/");
-  const sessionId = "app-" + crypto.randomUUID();
-  pending.set(s.sub, { sessionId, at: Date.now() });
-  try {
-    res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
-  } catch (e) {
-    res.status(502).send(page(`<h1>Could not start the sign-in</h1><p>${e.message}</p>`));
-  }
-});
-
-app.get("/tide/callback", async (req, res) => {
-  // The enclave calls it vendorEncryptedData, and sends back no session id of its own.
-  const data = req.query.vendorEncryptedData;
-  const s = current(req);
-  const started = s ? pending.get(s.sub) : null;
-  if (s) pending.delete(s.sub);
-
-  if (!data || !started) {
-    return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
-  }
-  try {
-    const { vuid } = await completeLogin(String(data), started.sessionId);
-    s.vuid = vuid;
-
-    /* Persisting the link is best effort.
-     *
-     * Writing app_metadata needs this application authorised for the Management API with
-     * update:users, which is a separate screen in the Auth0 dashboard and easy to miss. Without it
-     * the demo still works, the link just lives in this session and is gone on restart. Better to
-     * say so than to fail a sign-in over a permission the reader has not granted yet. */
-    try {
-      await auth0.storeVuid(s.sub, vuid);
-      s.persisted = true;
-    } catch (e) {
-      s.persisted = false;
-      s.persistError = e.message;
-      console.log("could not persist the vuid to Auth0:", e.message);
-    }
-    res.redirect("/");
-  } catch (e) {
-    res.status(502).send(page(`<h1>Sign-in could not be verified</h1><p>${e.message}</p>`));
   }
 });
 

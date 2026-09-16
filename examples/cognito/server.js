@@ -2,8 +2,9 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import crypto from "node:crypto";
 import * as cognito from "./cognito.js";
-import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { rolesFor } from "../shared/minidauth.js";
 import { tideless } from "../shared/tideless.js";
+import { link } from "../shared/link.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -22,6 +23,14 @@ const pending = new Map();
 const current = (req) => sessions.get(req.cookies.sid);
 // A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
 app.use(tideless({ resolveUid: async (req) => current(req)?.sub, role: "vault-reader" }));
+// Link a Tide identity to the signed-in user (see ../shared/link.js). onLinked, because the vuid is
+// kept on this in-memory session as well as written to the Cognito user.
+app.use(link({
+  resolveUser: (req) => { const s = current(req); return s ? { id: s.sub } : null; },
+  onLinked: async ({ req, vuid }) => { const s = current(req); if (!s) return; s.vuid = vuid; await cognito.storeVuid(s.username, vuid); },
+  appUrl: APP_URL,
+  afterLink: "/",
+}));
 
 const page = (body) => `<!doctype html><meta charset="utf-8">
 <style>
@@ -91,40 +100,6 @@ app.get("/callback", async (req, res) => {
   }
 });
 
-/* Link a Tide identity to the account that is already signed in. */
-app.get("/tide/link", async (req, res) => {
-  const s = current(req);
-  if (!s) return res.redirect("/");
-
-  const sessionId = "app-" + crypto.randomUUID();
-  pending.set(s.sub, { sessionId, at: Date.now() });
-  try {
-    res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
-  } catch (e) {
-    res.status(502).send(page(`<h1>Could not start the sign-in</h1><p>${e.message}</p>`));
-  }
-});
-
-app.get("/tide/callback", async (req, res) => {
-  // The enclave calls it vendorEncryptedData, and sends back no session id of its own.
-  const data = req.query.vendorEncryptedData;
-  const s = current(req);
-  const started = s ? pending.get(s.sub) : null;
-  if (s) pending.delete(s.sub);
-
-  if (!data || !started) {
-    return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
-  }
-
-  try {
-    const { vuid } = await completeLogin(String(data), started.sessionId);
-    s.vuid = vuid;
-    await cognito.storeVuid(s.username, vuid);
-    res.redirect("/");
-  } catch (e) {
-    res.status(502).send(page(`<h1>Sign-in could not be verified</h1><p>${e.message}</p>`));
-  }
-});
 
 /* Authentication is Cognito's answer. Authorisation is not.
  *

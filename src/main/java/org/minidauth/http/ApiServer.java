@@ -39,6 +39,12 @@ public final class ApiServer implements AutoCloseable {
      * cannot be replayed against another. */
     private final org.minidauth.auth.ClientAssertion clientAssertions;
     private final org.minidauth.auth.DokenOperators dokenOperators;
+    /** Verifies an end user's own token at the voucher/sign boundary. Null unless configured, in which
+     *  case those endpoints keep trusting the calling app's asserted uid (legacy tideless behaviour). */
+    private final org.minidauth.auth.UserToken userTokens;
+    /** Mints and verifies session-bound user dokens this service issues itself (Level 2). Always
+     *  present; minting still needs a verified user token, so it is only reachable when userTokens is set. */
+    private final org.minidauth.auth.MiniDoken miniDoken = new org.minidauth.auth.MiniDoken(120);
     private final VendorKeyStore keyStore;
     private final VrkLifecycle vrk;
     private final RotationScheduler rotation;
@@ -63,6 +69,7 @@ public final class ApiServer implements AutoCloseable {
         this.govStore = govStore;
         this.gov = gov;
         this.tideAuth = tideAuth;
+        this.userTokens = config.userToken == null ? null : new org.minidauth.auth.UserToken(config.userToken);
         // Roles are read live from the grant record rather than captured, so a revocation committed
         // through the quorum takes effect on the operator's very next request.
         this.dokenOperators = new org.minidauth.auth.DokenOperators(
@@ -394,23 +401,19 @@ public final class ApiServer implements AutoCloseable {
         router.post("/tide/vouchers", (ex, p) -> {
             /* Two ways in. An operator, as before, or a sign-in this service started, which is how
              * the enclave gets here: it runs in the user's browser and has no credential to
-             * present. Anything else is turned away, because issuing a voucher spends the VRK and
-             * draws on the licence's account quota.
-             *
-             * On the session lane every voucher is claimed against that session's budget and the
-             * service-wide ceiling, so a guessed or observed session id cannot spend the licence
-             * down. A non-live session falls through to the operator lane exactly as before. */
-            String session = Router.query(ex).get("session");
-            if (signIns.isLive(session)) {
-                if (!signIns.claimVoucher(session)) {
-                    throw new Json.HttpError(429,
-                            "voucher quota for this sign-in is exhausted, or the service is over its rate ceiling");
-                }
-            } else {
+             * present. The session path is a bypass unless the enclave console is deliberately in
+             * use, so it only skips operator auth when sign-in vouchers are enabled AND the session
+             * is a live one. Otherwise every caller must authenticate. */
+            if (!enableSignInVouchers() || !isLiveSignInSession(Router.query(ex).get("session"))) {
                 authenticate(ex);
             }
+            String voucherRequest = voucherRequestFrom(ex);
+            // This endpoint issues sign/encrypt vouchers only. A DECRYPT voucher must go through
+            // /vault/voucher, which checks the reader's quorum grant; issuing one here would let any
+            // holder of a service credential decrypt with no grant, defeating the whole read gate.
+            rejectDecryptVoucher(voucherRequest);
             Json.sendRaw(ex, 200,
-                    tideAuth.vouchers(voucherRequestFrom(ex)),
+                    tideAuth.vouchers(voucherRequest),
                     "application/json; charset=utf-8");
         });
 
@@ -446,11 +449,47 @@ public final class ApiServer implements AutoCloseable {
         router.post("/vault/sign", (ex, p) -> {
             authenticate(ex);
             Map<String, Object> body = Json.readBody(ex);
+            Resolved signer = resolveUserId(ex, body, Json.string(body, "payload"));
             String signature = gov.signForSubject(
-                    Json.requireString(body, "uid"),
-                    Json.requireString(body, "role"),
+                    signer.uid(),
+                    signer.role() != null ? signer.role() : Json.requireString(body, "role"),
                     Json.requireString(body, "payload").getBytes(java.nio.charset.StandardCharsets.UTF_8));
             Json.send(ex, 200, Map.of("signature", signature));
+        });
+
+        /* Mint a session-bound user doken (Level 2). The app authenticates itself as ever, and passes
+         * the end user's own token (verified here) plus the public half of a key the client generated.
+         * The returned doken names only the user and binds that session key; the client proves
+         * possession of the key on every voucher, so a doken lifted in transit is inert without it.
+         * Requires MC_USER_TOKEN_SECRET: this service will not mint a user identity it cannot verify. */
+        router.post("/vault/user-token", (ex, p) -> {
+            authenticate(ex);
+            if (userTokens == null) {
+                throw new Json.HttpError(501, "User dokens need MC_USER_TOKEN_SECRET set to verify the login");
+            }
+            Map<String, Object> body = Json.readBody(ex);
+            String presented = Json.string(body, "userToken");
+            if (presented == null) presented = ex.getRequestHeaders().getFirst("X-Tide-User");
+            if (presented == null || presented.isBlank()) {
+                throw new Json.HttpError(401, "A verified user token is required (userToken or X-Tide-User)");
+            }
+            org.minidauth.auth.UserToken.Verified verified;
+            try {
+                verified = userTokens.verify(presented.trim());
+            } catch (org.minidauth.auth.UserToken.Invalid e) {
+                throw new Json.HttpError(401, e.getMessage());
+            }
+            String sessionKey = Json.requireString(body, "sessionKey"); // Ed25519 SPKI, base64
+            // If the token is bound to a session key (cnf), it may only mint a doken for THAT key. So a
+            // captured bootstrap token cannot be rebound to an attacker's key: without the matching
+            // private key they can produce no proof of possession, and the doken is inert.
+            if (verified.cnf() != null && !verified.cnf().equals(sessionKey)) {
+                throw new Json.HttpError(403, "This user token is bound to a different session key");
+            }
+            // The minting app (through its sidecar) pins the role scope; the doken then only ever
+            // vouchers for that role, so a caller cannot later change it to reach another role's data.
+            String role = Json.string(body, "role");
+            Json.send(ex, 200, Map.of("userDoken", miniDoken.mint(verified.uid(), sessionKey, role)));
         });
 
         /* Issue a decrypt voucher on behalf of an application user who has no Tide identity.
@@ -462,11 +501,20 @@ public final class ApiServer implements AutoCloseable {
          * the read gate is this service reading a governed role, and the decrypt still happens in the
          * browser with the key never assembled. */
         router.post("/vault/voucher", (ex, p) -> {
-            authenticate(ex);
+            // A session-bound doken this service minted, with a proof of possession, is self-authorising:
+            // it already carries a verified identity and proves the holder, so the browser can call here
+            // directly with no relying-party credential. Every other path (Level 1 token, legacy uid)
+            // still needs the calling app to authenticate itself.
+            String dokenHeader = ex.getRequestHeaders().getFirst("X-Tide-Doken");
+            boolean selfAuthorising = dokenHeader != null && !dokenHeader.isBlank();
+            if (!selfAuthorising) authenticate(ex);
             Map<String, Object> body = Json.readBody(ex);
-            if (!gov.subjectHolds(Json.requireString(body, "uid"), Json.requireString(body, "role"))) {
-                throw new Json.HttpError(403, Json.requireString(body, "uid")
-                        + " does not hold " + Json.requireString(body, "role")
+            Resolved caller = resolveUserId(ex, body, Json.string(body, "voucherRequest"));
+            String uid = caller.uid();
+            // A doken pins the role; only otherwise may the request name it.
+            String role = caller.role() != null ? caller.role() : Json.requireString(body, "role");
+            if (!gov.attestedHolds(uid, role)) {
+                throw new Json.HttpError(403, uid + " does not hold " + role
                         + ", so this service will not voucher a decrypt for them");
             }
             Json.sendRaw(ex, 200,
@@ -498,6 +546,7 @@ public final class ApiServer implements AutoCloseable {
            console's own, taken from configuration rather than from the caller, so this cannot be
            used to point a Tide sign-in at somebody else's page. */
         router.post("/console/session/login-url", (ex, p) -> {
+            requireSignInVouchersEnabled();
             Map<String, Object> body = Json.readBody(ex);
             String sessionId = Json.requireString(body, "sessionId");
             rememberSignInSession(sessionId);
@@ -527,6 +576,7 @@ public final class ApiServer implements AutoCloseable {
          * replies rather than an error. Registering the session here is what lets the voucher
          * endpoint tell this window apart from an anonymous caller. */
         router.post("/console/session/voucher-url", (ex, p) -> {
+            requireSignInVouchersEnabled();
             authenticate(ex);
             String sessionId = "enclave-" + java.util.UUID.randomUUID();
             rememberSignInSession(sessionId);
@@ -541,6 +591,7 @@ public final class ApiServer implements AutoCloseable {
          * only useful for governance if the grant record gives that vuid a governance role, which
          * this endpoint has no way to influence. */
         router.post("/console/session/callback", (ex, p) -> {
+            requireSignInVouchersEnabled();
             Map<String, Object> body = Json.readBody(ex);
             var result = tideAuth.verifySignIn(
                     Json.requireString(body, "encryptedVendorData"),
@@ -632,6 +683,112 @@ public final class ApiServer implements AutoCloseable {
      * predate the console, it is a shared secret, and anything holding one can act as that
      * operator for as long as it exists.
      */
+    /**
+     * The user id to gate a voucher or sign on.
+     *
+     * <p>With {@code MC_USER_TOKEN_SECRET} set, it comes from a user token this service verifies
+     * itself ({@code X-Tide-User} header): the calling app can no longer name an arbitrary user, only
+     * relay one who holds a real signed token. Any {@code uid} in the body must then match, so a
+     * mismatched assertion is refused rather than silently ignored. Without that config, the legacy
+     * tideless behaviour stays: the app's asserted {@code uid} is trusted.
+     */
+    /** A resolved caller: the user id, and the role it is pinned to (from a doken) or null when the
+     *  caller may name the role in the request body. */
+    private record Resolved(String uid, String role) {}
+
+    private Resolved resolveUserId(HttpExchange ex, Map<String, Object> body, String boundRequest) {
+        // Level 2: a session-bound doken this service minted, proven by possession of the session key.
+        String doken = ex.getRequestHeaders().getFirst("X-Tide-Doken");
+        if (doken != null && !doken.isBlank()) {
+            org.minidauth.auth.MiniDoken.Parsed parsed;
+            try {
+                parsed = miniDoken.verify(doken.trim());
+                // The proof is bound to this exact request, so a captured one cannot be redirected.
+                miniDoken.verifyProofOfPossession(parsed,
+                        ex.getRequestHeaders().getFirst("X-Tide-PoP-TS"),
+                        ex.getRequestHeaders().getFirst("X-Tide-PoP-Nonce"),
+                        boundRequest,
+                        ex.getRequestHeaders().getFirst("X-Tide-PoP"));
+            } catch (org.minidauth.auth.MiniDoken.Invalid e) {
+                throw new Json.HttpError(401, e.getMessage());
+            }
+            requireUidMatches(body, parsed.uid());
+            // The doken pins the role: the caller cannot swap in a different one to reach data a
+            // different role would decrypt. Null only if the doken carried no role (legacy dokens).
+            String pinnedRole = (parsed.role() == null || parsed.role().isBlank()) ? null : parsed.role();
+            return new Resolved(parsed.uid(), pinnedRole);
+        }
+        // Level 1: a user token this service verifies (no session binding, so no replay resistance).
+        if (userTokens != null) {
+            String header = ex.getRequestHeaders().getFirst("X-Tide-User");
+            if (header == null || header.isBlank()) {
+                throw new Json.HttpError(401, "A verified user token is required in X-Tide-User");
+            }
+            String verified;
+            try {
+                verified = userTokens.verify(header.trim()).uid();
+            } catch (org.minidauth.auth.UserToken.Invalid e) {
+                throw new Json.HttpError(401, e.getMessage());
+            }
+            requireUidMatches(body, verified);
+            return new Resolved(verified, null);
+        }
+        // Legacy tideless: trust the calling app's asserted uid.
+        return new Resolved(Json.requireString(body, "uid"), null);
+    }
+
+    private void requireUidMatches(Map<String, Object> body, String verified) {
+        String claimed = Json.string(body, "uid");
+        if (claimed != null && !claimed.equals(verified)) {
+            throw new Json.HttpError(403, "The asserted uid does not match the verified user identity");
+        }
+    }
+
+    /**
+     * Whether the enclave sign-in flow (and its unauthenticated session-voucher path) is enabled.
+     *
+     * <p>Off by default. That path lets a browser mid-sign-in fetch vouchers with only a session id it
+     * chose, and the session is remembered the moment it is registered, not when a sign-in actually
+     * completes. In the tideless model nothing uses it, so an anonymous caller registering a session
+     * through {@code /console/session/login-url} and then minting a decrypt voucher through
+     * {@code /tide/vouchers?session=} is pure attack surface. A deployment that genuinely drives the
+     * enclave console turns it back on with {@code MC_ENABLE_SIGNIN_VOUCHERS=true}.
+     */
+    private static boolean enableSignInVouchers() {
+        String v = System.getenv("MC_ENABLE_SIGNIN_VOUCHERS");
+        return "true".equals(v) || "1".equals(v);
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper VOUCHER_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * Refuse a decrypt voucher request on an endpoint that does not check the reader's grant. The
+     * request carries an {@code ActionRequest}: "vendorsign" for signing/encryption, "vendordecrypt"
+     * for decryption. Only the latter is turned away here; a request we cannot parse is left to the
+     * voucher issuer, which rejects anything malformed.
+     */
+    private void rejectDecryptVoucher(String voucherRequest) {
+        String action = null;
+        try {
+            Object a = VOUCHER_MAPPER.readValue(voucherRequest, java.util.Map.class).get("ActionRequest");
+            action = a == null ? null : String.valueOf(a);
+        } catch (Exception ignored) {
+            // not JSON we recognise; fall through and let the voucher issuer decide
+        }
+        if ("vendordecrypt".equals(action)) {
+            throw new Json.HttpError(403,
+                    "Decrypt vouchers are only issued by /vault/voucher, which checks the reader's grant.");
+        }
+    }
+
+    private void requireSignInVouchersEnabled() {
+        if (!enableSignInVouchers()) {
+            throw new Json.HttpError(403,
+                    "Sign-in sessions are disabled. Set MC_ENABLE_SIGNIN_VOUCHERS=true to use the enclave console.");
+        }
+    }
+
     private Operator authenticate(HttpExchange ex) {
         String header = ex.getRequestHeaders().getFirst("Authorization");
         if (header == null) {

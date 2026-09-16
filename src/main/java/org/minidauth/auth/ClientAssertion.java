@@ -7,11 +7,8 @@ import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Deque;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,17 +34,13 @@ public final class ClientAssertion {
     /** Clock skew allowed in the caller's favour. */
     static final long SKEW_SECONDS = 60;
 
-    /** Enough jtis to cover the freshness window comfortably. */
-    private static final int REPLAY_MEMORY = 8192;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /* Seen jtis, in arrival order so the oldest can be dropped.
-     *
-     * Bounded rather than time-swept: an assertion older than the freshness window is refused before
-     * this is consulted, so forgetting the oldest can never let a still-valid one through. */
-    private final Set<String> seen = new HashSet<>();
-    private final Deque<String> order = new ConcurrentLinkedDeque<>();
+    /* Seen jtis, keyed to the time after which each may be forgotten. Time-swept, not count-bounded: a
+     * jti is remembered for the whole freshness window, so an assertion cannot be replayed by flooding
+     * the cache with fresh jtis to evict it (a count-bounded cache could be). */
+    private final Map<String, Long> seenUntil = new HashMap<>();
 
     private final String audience;
 
@@ -114,10 +107,10 @@ public final class ClientAssertion {
     }
 
     private synchronized void remember(String jti) {
-        if (!seen.add(jti)) throw new Invalid("This assertion has already been used");
-        order.addLast(jti);
-        while (order.size() > REPLAY_MEMORY) {
-            seen.remove(order.pollFirst());
+        long now = Instant.now().getEpochSecond();
+        seenUntil.entrySet().removeIf(e -> e.getValue() <= now); // forget only jtis past the window
+        if (seenUntil.putIfAbsent(jti, now + MAX_AGE_SECONDS + SKEW_SECONDS) != null) {
+            throw new Invalid("This assertion has already been used");
         }
     }
 

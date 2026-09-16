@@ -225,6 +225,23 @@ compromised; the key must not be there.
 Same three steps everywhere: store a `vuid` against your user, add a route that finishes the Tide
 sign-in, and read authorisation from grants rather than from your own tables.
 
+The middle step is a drop-in. Mount [`shared/link.js`](examples/shared/link.js) with one callback that
+says who is signed in and one that stores the vuid, and it adds `/tide/link` and `/tide/callback` for
+you, including remembering each sign-in against the user who started it so one account's reply cannot
+be applied to another:
+
+```js
+app.use(link({
+  resolveUser: (req) => currentUser(req),          // your signed-in user (needs .id), or null
+  storeVuid:   (id, vuid) => db.setVuid(id, vuid),
+  appUrl:      process.env.APP_URL,                // the callback address minidauth signed
+}));
+// then link to /tide/link from the account page
+```
+
+[examples/supabase](examples/supabase) uses it; the [tideless](#users-without-a-tide-account) page has
+the same shape in [`shared/tideless.js`](examples/shared/tideless.js).
+
 **[examples/payouts](examples/payouts) is the one to look at first if you run Supabase.** A payouts
 tool whose Supabase holds the money trail but cannot move the money: bank details stored as
 ciphertext, a reveal only a quorum-granted role can do, and payouts that exist only as network
@@ -258,6 +275,65 @@ putting roles in a token your own system can mint.
 
 Signing is not an endpoint you call. It happens inside the operations above: the token you receive,
 and the grants behind it, are already signed by a threshold of nodes.
+
+## Who needs a Tide account
+
+Two kinds of people touch this, and only one of them needs a Tide identity.
+
+**Administrators do.** The people who govern, who approve a role grant, deploy a policy, sit in the
+quorum. They sign in with Tide and approve inside their own enclave, because they are the authority.
+An approval has to be unforgeable and has to be credited to the person who made it, not to whatever
+server relayed it. That is what stops a quorum quietly collapsing to one app-server identity, and it
+is why the console's sign-in is a Tide sign-in and not a password.
+
+**Your users do not.** A regular user's permission is a record a quorum granted their existing id,
+not something they carry and prove. So they never get a Tide account, a doken or a second login. They
+stay on Cognito, Supabase, Auth.js, whatever you already run, and minidauth acts for them gated on the
+granted role. This is the [tideless path](#users-without-a-tide-account) below.
+
+The line is simple: you need a Tide identity to *decide* who may do what, and you do not need one to
+*do* the thing a decision already allows.
+
+### Two ways to run the quorum
+
+How strong the administrator side is, is a deployment choice.
+
+| | |
+|---|---|
+| **Operator tokens** (`MC_REQUIRE_TIDE_APPROVAL=false`) | Approvers hold bearer tokens in `operators.json`, no Tide accounts and nothing to sign in to. Fine for development. The separation between approvers is only as good as who holds which token, and grants are recorded without cohort attestation. |
+| **Enclave administrators** (default) | Approvers hold Tide identities and approve in their own enclave. Each approval is signed by, and credited to, that admin's vuid, so the quorum cannot collapse to one caller and the role grants are attested by the network. This is the one to run in production. |
+
+Same governance flow underneath. The difference is whether an approval is a token that was presented
+or a signature that was made.
+
+### Setting it up
+
+The order matters, and getting it wrong strands the key. [Running minidauth](docs/running.md) is the
+full version; the shape is:
+
+1. **Bring up the vendor key**, created, licensed and rotated on the network, never assembled. See
+   [bringing up a vendor key](docs/running.md#bringing-up-a-vendor-key).
+2. **Deploy the policies the key needs**: an encrypt policy, a decrypt policy, and the role-grants
+   policy. For tideless users the decrypt policy must be **PUBLIC** (voucher-gated), so a voucher
+   rather than a doken authorises the read. The first policy on a key is the admin policy and its
+   reach is permanent, so follow the order in the docs.
+3. **Stand up the quorum**: list operators in `operators.json` for token mode, or register your
+   administrators as Tide identities for enclave mode. Filing needs an approver, and whoever files a
+   request cannot also approve it.
+4. **Onboard a tideless user** by filing a role for their existing id and carrying it through the
+   quorum:
+   ```sh
+   curl -sX POST localhost:8081/iga/change-requests/role -H "Authorization: Bearer $ALICE" \
+     -H 'Content-Type: application/json' -d '{"vuid":"<app user id>","role":"vault-reader","tideless":true}'
+   # two more approve, then commit
+   ```
+   In enclave mode the approval is done on the console; in token mode it is
+   `POST /iga/change-requests/{id}/authorize` with an approver token, then `/commit`.
+5. **Run.** Your user logs in with your own auth, your app resolves their id, and minidauth issues
+   the encrypt and decrypt vouchers gated on the role. No Tide account on the user's side, ever.
+
+[examples/tideless](examples/tideless) is this end to end, and [examples/vault](examples/vault) is a
+full app built on it.
 
 ## Users without a Tide account
 

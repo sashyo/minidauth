@@ -67,11 +67,43 @@ public final class Config {
      */
     public final String publicUrl;
 
+    /**
+     * Optional. When set, the voucher and sign endpoints verify an end user's own token and take the
+     * user id from it, instead of trusting the calling application to assert the user id. This is the
+     * boundary the ORKs never see: they honour whatever voucher this service issues, so moving the
+     * identity check here from the app is a change to this service alone. Null unless
+     * {@code MC_USER_TOKEN_SECRET} is set, in which case the legacy app-asserted uid path stays.
+     */
+    public final UserTokenConfig userToken;
+
+    /**
+     * How this service verifies an end user's token. Prefer {@code publicKey}: the issuing app signs
+     * tokens with an Ed25519 private key and this service holds only the public half, so there is no
+     * shared symmetric secret that, once published or leaked from any holder, forges any user. The
+     * {@code secret} (HS256) path is kept for a quick start but should not be used in production.
+     */
+    public static final class UserTokenConfig {
+        public final String secret;    // HS256 shared secret (fallback; avoid in production)
+        public final String publicKey; // Ed25519 SPKI public key, base64 (preferred)
+        public final String issuer;    // required iss claim, or null to skip
+        public final String audience;  // required aud claim, or null to skip
+        public final String uidClaim;  // claim that carries the user id; defaults to "sub"
+
+        public UserTokenConfig(String secret, String publicKey, String issuer, String audience, String uidClaim) {
+            this.secret = secret;
+            this.publicKey = publicKey;
+            this.issuer = issuer;
+            this.audience = audience;
+            this.uidClaim = (uidClaim == null || uidClaim.isBlank()) ? "sub" : uidClaim;
+        }
+    }
+
     private Config(int port, Path dataDir, String homeOrkUrl, String payerPublic,
                    int thresholdT, int thresholdN, String adminToken, String adminName,
                    Path operatorsFile, String[] vrkModels, int graceDays,
                    boolean requireTideApproval, String voucherUrl, String publicUrl,
-                   String voucherPublicUrl, String voucherPublicUrlFile) {
+                   String voucherPublicUrl, String voucherPublicUrlFile,
+                   UserTokenConfig userToken) {
         this.port = port;
         this.dataDir = dataDir;
         this.homeOrkUrl = homeOrkUrl;
@@ -88,10 +120,19 @@ public final class Config {
         this.publicUrl = publicUrl;
         this.voucherPublicUrl = voucherPublicUrl;
         this.voucherPublicUrlFile = voucherPublicUrlFile;
+        this.userToken = userToken;
     }
 
     public static Config fromEnv() {
         String models = str("MC_VRK_MODELS", null);
+        String userSecret = str("MC_USER_TOKEN_SECRET", null);
+        String userPublicKey = str("MC_USER_TOKEN_PUBLIC_KEY", null);
+        UserTokenConfig userToken = (userSecret == null && userPublicKey == null) ? null : new UserTokenConfig(
+                userSecret,
+                userPublicKey,
+                str("MC_USER_TOKEN_ISSUER", null),
+                str("MC_USER_TOKEN_AUDIENCE", null),
+                str("MC_USER_TOKEN_UID_CLAIM", "sub"));
         return new Config(
                 intOrDefault("MC_PORT", 8081),
                 Paths.get(str("MC_DATA_DIR", "./data")).toAbsolutePath().normalize(),
@@ -108,7 +149,8 @@ public final class Config {
                 str("MC_VOUCHER_URL", null),
                 str("MC_PUBLIC_URL", null),
                 str("MC_VOUCHER_PUBLIC_URL", null),
-                str("MC_VOUCHER_PUBLIC_URL_FILE", null));
+                str("MC_VOUCHER_PUBLIC_URL_FILE", null),
+                userToken);
     }
 
     /**

@@ -1,9 +1,9 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import crypto from "node:crypto";
 import * as supabase from "./supabase.js";
-import { loginUrl, completeLogin, rolesFor } from "../shared/minidauth.js";
+import { rolesFor } from "../shared/minidauth.js";
 import { tideless } from "../shared/tideless.js";
+import { link } from "../shared/link.js";
 import { page, identityBlock } from "../shared/page.js";
 
 const app = express();
@@ -13,18 +13,14 @@ const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`;
 app.use(cookieParser());
 app.use(express.json());
 
-/* Tide sign-ins in flight, keyed by the user who started one.
- *
- * The enclave returns with its payload but not with the session id, so this side has to remember
- * which sign-in it started. Keying by the signed-in user is also what stops one account's reply
- * being applied to another. */
-const pending = new Map();
-
 /* Supabase signs in from the browser, so the access token arrives in a cookie this app sets from
  * the client rather than in a session it created itself. */
 const userOf = (req) => supabase.userFor(req.cookies.sb).catch(() => null);
 // A tideless page: the signed-in user encrypts and decrypts with no Tide account (see ../shared/tideless.js).
 app.use(tideless({ resolveUid: async (req) => (await userOf(req))?.id, role: "vault-reader" }));
+// Linking a Tide identity to the signed-in user: one mount handles the enclave round trip and hands
+// back the vuid to store (see ../shared/link.js). Adds GET /tide/link and GET /tide/callback.
+app.use(link({ resolveUser: userOf, storeVuid: (id, vuid) => supabase.storeVuid(id, vuid), appUrl: APP_URL }));
 
 app.get("/", async (req, res) => {
   const missing = supabase.missingConfig();
@@ -70,42 +66,6 @@ app.get("/", async (req, res) => {
     ${identityBlock(user.vuid, roles)}
     ${user.vuid ? "" : '<p><a href="/tide/link">Link a Tide identity</a></p>'}
     <p><a href="/protected">Open the protected page</a></p>`));
-});
-
-app.get("/tide/link", async (req, res) => {
-  const user = await userOf(req);
-  if (!user) return res.redirect("/");
-
-  const sessionId = "app-" + crypto.randomUUID();
-  pending.set(user.id, { sessionId, at: Date.now() });
-  try {
-    res.redirect(await loginUrl(sessionId, `${APP_URL}/tide/callback`));
-  } catch (e) {
-    res.status(502).send(page(`<h1>Could not start the sign-in</h1><p>${e.message}</p>`));
-  }
-});
-
-app.get("/tide/callback", async (req, res) => {
-  // The enclave calls it vendorEncryptedData, and sends no session id of its own.
-  const data = req.query.vendorEncryptedData;
-  const user = await userOf(req);
-  const started = user ? pending.get(user.id) : null;
-  if (user) pending.delete(user.id);
-
-  if (!data || !started) {
-    return res.status(400).send(page("<h1>Not a sign-in this app started</h1>"));
-  }
-  try {
-    const { vuid } = await completeLogin(String(data), started.sessionId);
-    await supabase.storeVuid(user.id, vuid);
-    // The access token in the cookie predates the change, so it is refreshed on the next sign-in.
-    res.send(page(`<h1>Linked</h1>
-      <p>Tide identity <code>${vuid.slice(0, 16)}…</code> is now on this account.</p>
-      <p>Sign in again to pick it up, because the token in your browser was issued before it.</p>
-      <p><a href="/logout">Sign out</a></p>`));
-  } catch (e) {
-    res.status(502).send(page(`<h1>Sign-in could not be verified</h1><p>${e.message}</p>`));
-  }
 });
 
 app.get("/logout", (req, res) => {
