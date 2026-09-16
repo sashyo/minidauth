@@ -44,7 +44,11 @@ public final class ApiServer implements AutoCloseable {
     private final org.minidauth.auth.UserToken userTokens;
     /** Mints and verifies session-bound user dokens this service issues itself (Level 2). Always
      *  present; minting still needs a verified user token, so it is only reachable when userTokens is set. */
-    private final org.minidauth.auth.MiniDoken miniDoken = new org.minidauth.auth.MiniDoken(120);
+    // A session-bound doken is a bearer credential the ORKs cannot revoke mid-life, so keep its life
+    // short: after logout the browser stops re-minting (the token endpoint requires a live session),
+    // and a doken captured just before logout is only usable for this window. The browser re-mints
+    // transparently when a read finds the doken expired, so a short TTL costs a re-mint, not a failure.
+    private final org.minidauth.auth.MiniDoken miniDoken = new org.minidauth.auth.MiniDoken(30);
     private final VendorKeyStore keyStore;
     private final VrkLifecycle vrk;
     private final RotationScheduler rotation;
