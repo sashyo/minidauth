@@ -35,8 +35,10 @@ public final class UserToken {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Clock skew allowed in the user's favour. */
-    private static final long SKEW_SECONDS = 60;
+    /** Clock skew allowed in the user's favour. Kept small: a large skew extends how long a token
+     *  captured before logout stays acceptable (its window is the token's TTL plus this skew), and
+     *  NTP-synced clocks do not need 60 seconds of slack. */
+    private static final long SKEW_SECONDS = 10;
 
     private final byte[] secret;       // HS256 (fallback), or null when using a public key
     private final PublicKey publicKey; // Ed25519 (preferred), or null when using a secret
