@@ -100,8 +100,10 @@ public final class UserToken {
         long now = Instant.now().getEpochSecond();
         Long exp = num(claims, "exp");
         Long nbf = num(claims, "nbf");
-        if (exp != null && now > exp + SKEW_SECONDS) throw new Invalid("The user token has expired");
-        if (nbf != null && now < nbf - SKEW_SECONDS) throw new Invalid("The user token is not yet valid");
+        if (exp == null) throw new Invalid("The user token requires an integer expiry");
+        if (claims.containsKey("nbf") && nbf == null) throw new Invalid("The user token not-before time is malformed");
+        if (exp <= now - SKEW_SECONDS) throw new Invalid("The user token has expired");
+        if (nbf != null && nbf > now + SKEW_SECONDS) throw new Invalid("The user token is not yet valid");
         if (issuer != null && !issuer.equals(str(claims, "iss"))) throw new Invalid("The user token issuer is not trusted");
         if (audience != null && !audienceMatches(claims)) throw new Invalid("The user token was not meant for this service");
 
@@ -148,6 +150,7 @@ public final class UserToken {
 
     private static Long num(Map<String, Object> m, String k) {
         Object v = m.get(k);
-        return v instanceof Number n ? n.longValue() : null;
+        // Reject fractional and out-of-range values instead of truncating or wrapping them.
+        return v instanceof Integer || v instanceof Long ? ((Number) v).longValue() : null;
     }
 }

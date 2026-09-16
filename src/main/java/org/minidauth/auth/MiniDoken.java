@@ -7,7 +7,7 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +50,7 @@ public final class MiniDoken {
 
     private final byte[] secret; // minted at boot, never leaves this process
     private final long ttlSeconds;
+    private final Clock clock;
 
     // Proofs seen, keyed by nonce -> the time after which it may be forgotten. Eviction is by TIME,
     // not count: a nonce is remembered for the whole freshness window, so a captured proof cannot be
@@ -57,7 +58,12 @@ public final class MiniDoken {
     private final Map<String, Long> seenUntil = new HashMap<>();
 
     public MiniDoken(long ttlSeconds) {
+        this(ttlSeconds, Clock.systemUTC());
+    }
+
+    MiniDoken(long ttlSeconds, Clock clock) {
         this.ttlSeconds = ttlSeconds;
+        this.clock = clock;
         byte[] s = new byte[32];
         new SecureRandom().nextBytes(s);
         this.secret = s;
@@ -74,7 +80,7 @@ public final class MiniDoken {
      *  to a single {@code role} scope, set by the minting app. The role is then not something the
      *  caller can change at voucher time: a doken scoped to one role cannot request another. */
     public String mint(String uid, String sessionKeyB64, String role) {
-        long now = Instant.now().getEpochSecond();
+        long now = clock.instant().getEpochSecond();
         String header = B64URL.encodeToString("{\"alg\":\"HS256\",\"typ\":\"mdk\"}".getBytes(StandardCharsets.US_ASCII));
         String claims;
         try {
@@ -108,7 +114,7 @@ public final class MiniDoken {
             throw new Invalid("The user doken claims could not be read");
         }
         Long exp = num(claims, "exp");
-        if (exp == null || Instant.now().getEpochSecond() > exp) throw new Invalid("The user doken has expired");
+        if (exp == null || clock.instant().getEpochSecond() >= exp) throw new Invalid("The user doken has expired");
         String uid = str(claims, "sub");
         String cnf = str(claims, "cnf");
         if (uid == null || uid.isBlank() || cnf == null || cnf.isBlank()) throw new Invalid("The user doken is incomplete");
@@ -134,7 +140,8 @@ public final class MiniDoken {
         } catch (Exception e) {
             throw new Invalid("The proof of possession timestamp is malformed");
         }
-        if (Math.abs(Instant.now().getEpochSecond() - ts) > POP_SKEW_SECONDS) {
+        long now = clock.instant().getEpochSecond();
+        if (ts < now - POP_SKEW_SECONDS || ts > now + POP_SKEW_SECONDS) {
             throw new Invalid("The proof of possession is stale");
         }
         String requestHash = sha256Hex(boundRequest == null ? "" : boundRequest);
@@ -142,7 +149,7 @@ public final class MiniDoken {
         if (!ed25519Verifies(dk.sessionKeyB64(), signed, popSigB64)) {
             throw new Invalid("The proof of possession did not verify");
         }
-        remember(nonce); // last, so a failure above cannot record a replay slot
+        remember(nonce, ts); // last, so a failure above cannot record a replay slot
     }
 
     private static String sha256Hex(String s) {
@@ -156,10 +163,12 @@ public final class MiniDoken {
         }
     }
 
-    private synchronized void remember(String nonce) {
-        long now = Instant.now().getEpochSecond();
+    private synchronized void remember(String nonce, long timestamp) {
+        long now = clock.instant().getEpochSecond();
         seenUntil.entrySet().removeIf(e -> e.getValue() <= now); // forget only nonces past the window
-        if (seenUntil.putIfAbsent(nonce, now + POP_SKEW_SECONDS + 5) != null) {
+        // Future-dated proofs remain fresh longer than one skew window after receipt. Keep their
+        // nonce through the last accepted second of the proof's own timestamp window.
+        if (seenUntil.putIfAbsent(nonce, timestamp + POP_SKEW_SECONDS + 1) != null) {
             throw new Invalid("This proof of possession has already been used");
         }
     }
