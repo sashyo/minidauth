@@ -404,9 +404,11 @@ public final class ApiServer implements AutoCloseable {
              * present. The session path is a bypass unless the enclave console is deliberately in
              * use, so it only skips operator auth when sign-in vouchers are enabled AND the session
              * is a live one. Otherwise every caller must authenticate. */
-            if (!enableSignInVouchers() || !isLiveSignInSession(Router.query(ex).get("session"))) {
-                authenticate(ex);
-            }
+            String session = Router.query(ex).get("session");
+            boolean viaSession = enableSignInVouchers()
+                    && session != null && !session.isBlank()
+                    && signIns.claimVoucher(session); // checks the session is live and within its budget
+            if (!viaSession) authenticate(ex);
             String voucherRequest = voucherRequestFrom(ex);
             // This endpoint issues sign/encrypt vouchers only. A DECRYPT voucher must go through
             // /vault/voucher, which checks the reader's quorum grant; issuing one here would let any
@@ -483,7 +485,13 @@ public final class ApiServer implements AutoCloseable {
             // If the token is bound to a session key (cnf), it may only mint a doken for THAT key. So a
             // captured bootstrap token cannot be rebound to an attacker's key: without the matching
             // private key they can produce no proof of possession, and the doken is inert.
-            if (verified.cnf() != null && !verified.cnf().equals(sessionKey)) {
+            // The token MUST be bound to a session key, and to THIS one. An unbound token would let a
+            // separate client mint a doken for a key it controls, so reusing a captured token would
+            // recover plaintext; requiring the binding makes a captured token inert.
+            if (verified.cnf() == null || verified.cnf().isBlank()) {
+                throw new Json.HttpError(403, "This user token is not bound to a session key; it cannot mint a doken");
+            }
+            if (!verified.cnf().equals(sessionKey)) {
                 throw new Json.HttpError(403, "This user token is bound to a different session key");
             }
             // The minting app (through its sidecar) pins the role scope; the doken then only ever
@@ -508,6 +516,14 @@ public final class ApiServer implements AutoCloseable {
             String dokenHeader = ex.getRequestHeaders().getFirst("X-Tide-Doken");
             boolean selfAuthorising = dokenHeader != null && !dokenHeader.isBlank();
             if (!selfAuthorising) authenticate(ex);
+            // Decryption requires a session-bound doken and proof of possession by default: the token
+            // path (X-Tide-User / legacy uid) decrypts with no session key, which is the weaker "the
+            // server can read" model. Turn it on explicitly with MC_ALLOW_TOKEN_DECRYPT.
+            if (!selfAuthorising
+                    && !("true".equals(System.getenv("MC_ALLOW_TOKEN_DECRYPT")) || "1".equals(System.getenv("MC_ALLOW_TOKEN_DECRYPT")))) {
+                throw new Json.HttpError(403,
+                        "Decryption requires a session-bound doken and proof of possession.");
+            }
             Map<String, Object> body = Json.readBody(ex);
             Resolved caller = resolveUserId(ex, body, Json.string(body, "voucherRequest"));
             String uid = caller.uid();
