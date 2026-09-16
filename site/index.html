@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minidauth</title>
+<meta name="description" content="minidauth gives your existing login a key nobody holds. The key exists only as shares across the Tide network, signs every token, policy and role grant, and decides who may decrypt. Keep Cognito, Clerk, Supabase, Better Auth or Auth0 as they are.">
+<link rel="canonical" href="https://dauth.me/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="minidauth">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:description" content="Give your existing login a key that nobody holds. A stolen copy of your database contains nothing readable, and no key to make it readable.">
+<meta property="og:url" content="https://dauth.me/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "minidauth",
+  "applicationCategory": "SecurityApplication",
+  "operatingSystem": "Docker, Linux, macOS",
+  "license": "https://opensource.org/licenses/MIT",
+  "description": "A service that gives an existing login a key that is never assembled. The key lives as shares across the Tide network, signs every token, policy and role grant, and gates decryption on quorum-granted roles.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "codeRepository": "https://github.com/sashyo/minidauth"
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="./" aria-label="minidauth, home"><img src="assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="#problem">The problem</a>
+    <a class="pill" href="#how">How it works</a>
+    <a class="pill" href="#projects">Projects using it</a>
+    <a class="pill" href="#code">In your code</a>
+    <a class="pill" href="#where">Where to use it</a>
+    <a class="pill" href="#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <h1>Give your existing login <span>a key that nobody holds</span></h1>
+      <p class="lede">
+        minidauth is a small open source service you run next to your app. It takes the key that
+        encrypts your users' data out of your servers.
+      </p>
+      <p style="margin-top:18px">
+        The key is spread across a network of independent machines, so no single one of them, and
+        not you either, ever holds the whole thing. When your app needs to read something it asks,
+        and the network checks the rules and does the work, or refuses.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="#start">Run it in two commands</a>
+        <a class="btn" href="#projects">See it in real apps</a>
+      </div>
+      <p class="micro">Docker image · MIT licensed · free tier on the live network</p>
+
+      <figure class="cohort">
+        <ul class="units" aria-hidden="true">
+          <li class="on"></li><li class="on"></li><li class="on"></li><li class="on"></li><li class="on"></li>
+          <li class="on"></li><li class="on"></li><li class="on"></li><li class="on"></li><li class="on"></li>
+          <li class="on"></li><li class="on"></li><li class="on"></li><li class="on"></li>
+          <li></li><li></li><li></li><li></li><li></li><li></li>
+        </ul>
+        <figcaption>14 of 20 machines have to agree before the key does anything</figcaption>
+      </figure>
+    </header>
+
+    <section id="problem">
+      <h2>The problem it solves</h2>
+      <p>
+        Right now your app can read everything it stores. That is not a bug, it is how it is built:
+        the data sits in your database and the key sits in your server, so whoever gets both gets
+        everything. A stolen backup, a leaked environment file, a support session belonging to the
+        wrong person. Nothing has to be broken for the data to walk out.
+      </p>
+      <p>
+        Encrypting the database does not fix it, because the thing that decrypts the database is
+        standing right next to it. minidauth makes that key impossible to take, by making sure it
+        never exists in one piece anywhere.
+      </p>
+      <blockquote class="pull">A stolen copy of your database contains nothing readable, and no key to make it readable.</blockquote>
+
+      <figure class="shot">
+        <img src="assets/vault-raw-store.png" alt="A database dump of the vault example, with every sensitive field stored as ciphertext" width="1265" height="620" loading="lazy">
+        <figcaption>The vault example printing its own table: exactly what a stolen dump returns</figcaption>
+      </figure>
+    </section>
+
+    <section id="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Your users log in the way they already do</h3>
+            <p>Cognito, Clerk, Supabase, Better Auth, Auth0, whatever you run today. No second password and no migration. You store one extra column against each user and add one callback route.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Your app asks instead of doing</h3>
+            <p>To encrypt, decrypt or sign something, your app calls minidauth rather than reaching for a key. There is no key on the box to steal, and no way for your own code to decide it is allowed to read.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>The network decides and does the work</h3>
+            <p>Fourteen of twenty independent machines check the caller's role against a signed policy, then do the work together. The key is never put back together, not even in order to use it. If the request breaks the policy, they refuse.</p>
+          </div>
+        </li>
+      </ol>
+      <p style="margin-top:34px">
+        Refusing is the part that encryption alone cannot do. A policy carries a contract, and that
+        contract reads your payload before the machines will sign it, so one of these comes back
+        signed and the other does not:
+      </p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+<pre><span class="c">// signed by the cohort</span>
+amount=250;to=alice
+
+<span class="c">// refused, by fourteen machines independently</span>
+amount=5000;to=alice</pre>
+      </div>
+      <p style="margin-top:24px">
+        The rules themselves are set by your own administrators, and never by one of them alone. A
+        role is granted when several of them approve it, and the network signs it only then.
+      </p>
+
+      <figure class="shot">
+        <img src="assets/vault-records.png" alt="The vault example showing a client record with three encrypted fields, marked sealed, and the reader's granted role" width="1265" height="450" loading="lazy">
+        <figcaption>The same app from the user's side: three fields sealed, one granted role, no second login</figcaption>
+      </figure>
+    </section>
+
+    <section id="projects">
+      <h2>Projects it has been added to</h2>
+      <p>
+        Open source apps with their own logins, their own databases and no interest in changing
+        either. Each name below is the fork, so you can read the whole change as a diff against
+        upstream. The minidauth side is the same three steps in every one of them.
+      </p>
+      <dl class="rows">
+        <div class="row">
+          <dt><a href="https://github.com/sashyo/formbricks">Formbricks</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dd>The open source survey platform. Answers are sealed before they reach Postgres and opened only for a <code>response-reader</code> role a quorum granted. Take the role away and the same dashboard shows nothing readable, with no change to Formbricks' own login.</dd>
+        </div>
+        <div class="row">
+          <dt><a href="https://github.com/sashyo/twenty">Twenty</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dd>The open source CRM. Contact fields are sealed record by record and a read takes a signed identity holding the role, so an unauthenticated call gets ciphertext and nothing else. The fork is the whole change, and Twenty's own login is untouched.</dd>
+        </div>
+        <div class="row">
+          <dt>WordPress <span class="chip">Early</span></dt>
+          <dd>A plugin that encrypts chosen post and user fields through minidauth, so a WordPress database backup stops being a copy of everything in it.</dd>
+        </div>
+      </dl>
+      <p style="margin-top:28px">
+        The <a href="https://github.com/sashyo/minidauth/tree/main/examples">examples</a> cover five
+        auth systems with the same integration file in each, and the repository will take a link to
+        yours.
+      </p>
+    </section>
+
+    <section id="code">
+      <h2>What changes in your code</h2>
+      <dl class="rows">
+        <div class="row">
+          <dt>One column</dt>
+          <dd>A <code>vuid</code> on your user record, which the user cannot edit. It is how minidauth knows which person is being asked about.</dd>
+        </div>
+        <div class="row">
+          <dt>One route</dt>
+          <dd>A callback that finishes the Tide sign-in and hands you back that vuid. It is a drop-in in every example.</dd>
+        </div>
+        <div class="row">
+          <dt>One lookup</dt>
+          <dd>Ask what roles someone holds on each request, instead of storing roles in your own tables.</dd>
+        </div>
+      </dl>
+      <div class="code" style="margin-top:28px">
+        <button class="copy" type="button">Copy</button>
+<pre><span class="c">// before: your database decides</span>
+if (user.role === "admin") return decrypt(record);
+
+<span class="c">// after: the network decides, and can refuse</span>
+const roles = await minidauth.rolesFor(user.vuid);</pre>
+      </div>
+    </section>
+
+    <section id="where">
+      <h2>Where to use it</h2>
+      <p>
+        It earns its keep when the data you hold would be bad news in someone else's hands, and you
+        cannot honestly say your server is the last line of defence. A small team holding health
+        records, legal files or financial detail, with no security function behind it. A product
+        where support has to help people without being able to read their records. Any admin panel
+        that can see everything, given that the most common breach is not a clever exploit but a
+        valid session belonging to somebody with too much access.
+      </p>
+      <p class="note" style="margin-top:28px">
+        <strong>Not for you if</strong> the data is public anyway, if you need analytics over
+        plaintext server side, or if you cannot tolerate a network hop on reads. Those are real
+        costs and no amount of cryptography talks you out of them.
+      </p>
+    </section>
+
+    <section id="writing">
+      <h2>Blog</h2>
+      <div class="posts">
+        <a class="post-link" href="blog/no-central-authority.html">
+          <time datetime="2026-09-16">2026.09.16</time>
+          <div>
+            <h3>Taking the central authority out of your app</h3>
+            <p>What moves off your server when a threshold of nodes holds the key, and what that changes about asking people to trust you.</p>
+          </div>
+        </a>
+        <a class="post-link" href="blog/the-first-policy-is-the-only-one.html">
+          <time datetime="2026-09-15">2026.09.15</time>
+          <div>
+            <h3>The first policy is the only one that pack will ever sign</h3>
+            <p>Two paid vendor keys went in the bin teaching us this.</p>
+          </div>
+        </a>
+        <a class="post-link" href="blog/what-a-stolen-database-looks-like.html">
+          <time datetime="2026-09-08">2026.09.08</time>
+          <div>
+            <h3>What a stolen database looks like</h3>
+            <p>Write a row, print the table, read the ciphertext. Then ask the network to sign something it should refuse.</p>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <section id="start">
+      <div class="cta">
+        <h2>Try it</h2>
+        <p class="hint">Two commands, port 8081, no Java and no build</p>
+        <div class="code">
+          <button class="copy" type="button">Copy</button>
+<pre>curl -O https://raw.githubusercontent.com/sashyo/minidauth/main/docker-compose.yml
+MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up</pre>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn--primary" href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Set up a key</a>
+          <a class="btn" href="https://github.com/sashyo/minidauth/tree/main/examples">Wire it to your login</a>
+        </div>
+      </div>
+      <p style="margin-top:28px">
+        minidauth is MIT and free to run. The vendor key it manages needs a Tide licence, and the
+        free tier is not limited for any of this: policy deployment, role grants and voucher
+        decryption all work on it. Read
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Running minidauth</a>
+        before the first call rather than after, because the first policy on a key is permanent and
+        there is no second attempt.
+      </p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+
+  </main>
+</div>
+
+<script src="site.js"></script>
+</body>
+</html>

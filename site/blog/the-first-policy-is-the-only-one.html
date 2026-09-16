@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The first policy is the only one that pack will ever sign</title>
+<meta name="description" content="A vendor key's authorizer pack signs one policy and is then revoked, per node, whether or not the signature succeeded. Here is how that burns keys and how to avoid it.">
+<link rel="canonical" href="https://dauth.me/blog/the-first-policy-is-the-only-one.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The first policy is the only one that pack will ever sign">
+<meta property="og:description" content="Two paid vendor keys went in the bin teaching us this. The authorizer pack is spent on one attempt, per node, whether or not the signature succeeds.">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <article class="post">
+      <p class="label">Vendor keys</p>
+      <h1>The first policy is the only one that pack will ever sign</h1>
+      <div class="byline">
+        <time datetime="2026-09-15">15 September 2026</time><span>·</span><span>7 min</span>
+      </div>
+
+      <p class="lede">
+        Creating a vendor key is the one step in minidauth that costs money and cannot be undone. The
+        first policy you sign on that key is the only policy its authorizer pack will ever sign, and
+        the pack is spent whether or not the signature succeeded. Two paid keys went in the bin
+        before we understood the second half of that sentence.
+      </p>
+
+      <h2>What the pack is</h2>
+      <p>
+        When a vendor key is finalised, the network mints an authorizer pack for it. The pack is what
+        lets a brand new key do anything at all: there are no policies yet, so there is nothing else
+        that could authorise a signing request. It binds the vendor rotating key point that was
+        active at the moment of finalisation, and it authorises a <code>Policy:1</code> sign.
+      </p>
+      <p>
+        It authorises exactly one of them. When a node processes a request carrying that pack it
+        revokes its own entry as it goes, deliberately, so that everything afterwards has to run
+        through the policy the request just deployed. As a design that makes sense, and the trouble
+        is only that the revocation is unconditional in ways which are not obvious from outside.
+      </p>
+
+      <h2>Three ways to lose a key</h2>
+
+      <h3>1. Scope the first policy too narrowly</h3>
+      <p>
+        The pack signs attestation units as well as policies, and every token your users get is built
+        from attestation units. So the policy that replaces the pack has to cover both
+        <code>AttestationUnit:1</code> and <code>Policy:1</code>, for example with the
+        <code>any</code> wildcard. Miss one side and the key survives in a shape that is no use:
+      </p>
+      <ul>
+        <li>A policy over <code>AttestationUnit:1</code> alone keeps tokens working and can never deploy anything again.</li>
+        <li>A policy over <code>PolicyEnabledEncryption:1</code> alone ends policy deployment on that key permanently, and there is no route back.</li>
+      </ul>
+      <p>
+        You cannot fix this later by deploying something better. A deployed policy can be rotated in
+        place, but the replacement has to carry the same key id, the same contract and the same
+        models, so rotation is a lever for changing parameters and expiry, not for narrowing or
+        widening reach. Whatever the first policy can authorise, it can authorise for the life of the
+        key.
+      </p>
+
+      <h3>2. Retry</h3>
+      <p>
+        This is the one that cost us a key. The revocation is per node, and it happens when that node
+        processes the request, not when the cohort produces a signature. A first attempt that misses
+        the threshold for any transient reason, a few nodes slow or unreachable, a tunnel blip,
+        still burns every node that did respond. The retry then burns more of the pool that is still
+        live, and the attempt after that burns more, until fewer nodes hold a valid entry than the
+        threshold needs and the sign is permanently impossible.
+      </p>
+      <p>
+        Nothing local tells you this is happening. The policy list stays empty the whole time,
+        because no policy ever got deployed, which looks exactly like the failure you are retrying.
+        On one key the fan-out ended at nine nodes answering and eleven returning
+        <code class="mono">This authorizer has not been allowed</code>, against a threshold of
+        fourteen. The key was dead and the console still showed an empty policy list and a plausible
+        error.
+      </p>
+
+      <p class="note">
+        <strong>Never retry a first policy deployment.</strong> Check the whole cohort is reachable
+        before the one attempt you get. A missed threshold on the first try already means minting a
+        new key.
+      </p>
+
+      <h3>3. Send something only some of the nodes reject</h3>
+      <p>
+        The second key died differently and more instructively. The policy referenced a contract, and
+        we had left <code>uploadContract</code> out of the spec, so the contract source never
+        travelled with the request. Two of the nodes validate the contract and rejected it with
+        <code class="mono">Policy referenced a contract which doesn't exist</code>. The other twelve
+        do not validate it, co-signed happily, and revoked their entries on the way past.
+      </p>
+      <p>
+        Twelve is below the threshold of fourteen, so no policy was deployed, and the pack was spent
+        regardless: the next attempt came back with eight nodes still holding a valid entry and
+        twelve reporting it revoked. A request that is malformed in a way only part of the cohort
+        checks for is still a request the rest of the cohort will burn itself on.
+      </p>
+
+      <h2>The rotation trap, for completeness</h2>
+      <p>
+        There is a fourth way, and it does not involve deploying anything. The pack binds the vendor
+        rotating key point that was live at finalisation, and a rotation is not re-issued into it. So
+        rotating before the first policy is signed leaves you signing with a key the pack does not
+        recognise, and the node says:
+      </p>
+      <div class="code"><pre>VRK:1: VRK Authorization Flow failed because VRK signature
+of this request could not be verified.</pre></div>
+      <p>
+        The message is accurate and says nothing whatsoever about rotation, which cost us an
+        afternoon of looking in the wrong place. There is a cheap way to detect it in advance: both
+        the pack and the active vendor rotating key carry a 32 byte Ed25519 point, and those two
+        points are identical until a rotation happens, so comparing them before you send anything
+        tells you whether the attempt can work at all. Signing the first policy is a capability you
+        have before your first rotation and not after it.
+      </p>
+
+      <h2>What to do instead</h2>
+      <ol>
+        <li>
+          <strong>Rehearse on a key you do not mind losing.</strong> A free tier key on the live
+          network is created with <code>{"licensingTier":"free","email":"..."}</code> and finalises
+          immediately with no payment step. It is not limited in the ways that matter here: policy
+          deployment, voucher decryption and the whole tideless flow work on it. The paid tier buys
+          licensing and quota, not capability. Run your exact policy spec through a free tier key
+          first, and only then spend a paid one.
+        </li>
+        <li>
+          <strong>Make the first request byte complete.</strong> For a bootstrap covering
+          <code>AttestationUnit:1</code> and <code>Policy:1</code> over a contract registered from
+          source, that means <code>"uploadContract": true</code> in the spec so the source ships with
+          the request.
+        </li>
+        <li>
+          <strong>Set the policy version the network speaks.</strong> The bindings build version 4
+          and the released network understands 3, so <code>MC_POLICY_VERSION=3</code>. Without it the
+          deployment fails with <code class="mono">Error with signing model: Policy:1</code>, and the
+          actual reason is in a response body the bindings discard.
+        </li>
+        <li>
+          <strong>Check the cohort is up.</strong> Ask every node in the cohort whether it is active
+          before you send the one request that matters.
+        </li>
+        <li>
+          <strong>Grant somebody the admin role first.</strong> minidauth refuses the first policy
+          deployment until a person holds <code>governance-admin</code>, because there is no way back
+          from deploying with nobody able to govern the result.
+        </li>
+      </ol>
+
+      <h2>Why it is like this</h2>
+      <p>
+        All four failures come from the same property, which is that there is no administrator
+        anywhere who can undo a decision the network has already made, including on our behalf. That
+        property is the entire reason to use any of this: a key that can be rescued by an appeal to a
+        support desk is also a key that can be taken by anyone who can convince a support desk.
+      </p>
+      <p>
+        What it costs is that the first few minutes of a key's life carry more weight than
+        everything that follows, and the tooling does not yet make that obvious enough to save you.
+        Read
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Running minidauth</a>
+        end to end before your first call, not after it.
+      </p>
+
+      <p style="margin-top:34px"><a class="btn" href="./">More posts</a></p>
+    </article>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

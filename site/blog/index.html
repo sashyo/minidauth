@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minidauth blog</title>
+<meta name="description" content="Notes from building minidauth: threshold signing, vendor key lifecycle, policy deployment, and the mistakes that cost us real keys.">
+<link rel="canonical" href="https://dauth.me/blog/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="minidauth blog">
+<meta property="og:description" content="Notes from building minidauth: threshold signing, vendor keys, policy deployment, and the mistakes that cost us real keys.">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#projects">Projects using it</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <p class="label">Field notes</p>
+      <h1>What building it taught us</h1>
+      <p class="lede">
+        Threshold cryptography fails in ways ordinary key management does not, and the error
+        messages rarely name the cause. These are the write-ups, including the expensive ones.
+      </p>
+    </header>
+
+    <section>
+      <div class="head">
+        <span class="cap">Posts</span><span class="rule"></span>
+      </div>
+
+      <div class="posts">
+        <a class="post-link" href="no-central-authority.html">
+          <time datetime="2026-09-16">2026.09.16</time>
+          <div>
+            <h3>Taking the central authority out of your app</h3>
+            <p>Every app has a process that can read every row. Here is what moves off your server when a threshold of nodes holds the key instead, and what that changes about asking people to trust you.</p>
+          </div>
+        </a>
+
+        <a class="post-link" href="the-first-policy-is-the-only-one.html">
+          <time datetime="2026-09-15">2026.09.15</time>
+          <div>
+            <h3>The first policy is the only one that pack will ever sign</h3>
+            <p>Two paid vendor keys went in the bin teaching us this. The authorizer pack is spent on one attempt, per node, whether or not the signature succeeds.</p>
+          </div>
+        </a>
+
+        <a class="post-link" href="what-a-stolen-database-looks-like.html">
+          <time datetime="2026-09-08">2026.09.08</time>
+          <div>
+            <h3>What a stolen database looks like</h3>
+            <p>The notes demo writes a row, prints the table, and then asks the network to sign a payment it should not sign. Both halves in about four minutes.</p>
+          </div>
+        </a>
+      </div>
+
+      <p class="note" style="margin-top:22px">
+        <strong>Want one of these on a topic?</strong> Open an issue on
+        <a href="https://github.com/sashyo/minidauth">GitHub</a> and say what you are stuck on. The
+        posts here started as answers to questions people asked twice.
+      </p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

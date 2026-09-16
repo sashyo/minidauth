@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What a stolen database looks like</title>
+<meta name="description" content="The minidauth notes demo writes a row, prints the table so you can read the ciphertext yourself, and then asks the Tide network to sign a payment it should refuse.">
+<link rel="canonical" href="https://dauth.me/blog/what-a-stolen-database-looks-like.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="What a stolen database looks like">
+<meta property="og:description" content="Write a row, print the table, read the ciphertext. Then ask the network to sign a payment it should refuse.">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <article class="post">
+      <p class="label">Demos</p>
+      <h1>What a stolen database looks like</h1>
+      <div class="byline">
+        <time datetime="2026-09-08">8 September 2026</time><span>·</span><span>5 min</span>
+      </div>
+
+      <p class="lede">
+        Claims about encryption are cheap to make, so the smallest demo in the repository is built to
+        be checked rather than believed. It writes a note, then prints the contents of the file it
+        just wrote to, and leaves you to read the row. After that it does the half that encryption on
+        its own cannot do, which is the part I find more interesting and which almost nobody asks
+        about first.
+      </p>
+
+      <h2>Running it</h2>
+      <p>
+        The notes demo has no login provider, no user table and no password, which keeps the thing
+        being demonstrated visible. Two commands bring the service up on port 8081:
+      </p>
+      <div class="code"><pre>curl -O https://raw.githubusercontent.com/sashyo/minidauth/main/docker-compose.yml
+MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up</pre></div>
+      <p>
+        You write a note and it is encrypted in the browser, inside the enclave, under a policy the
+        Tide network enforces. The server sees the ciphertext on its way to disk and never sees
+        anything else. Then the page dumps the notes file onto the screen, and what is in there is
+        ciphertext, not a redacted rendering of the row for demonstration purposes but the row as it
+        was stored. Whether that is impressive depends entirely on the next paragraph.
+      </p>
+
+      <h2>Why there is nothing to steal alongside it</h2>
+      <p>
+        Encrypting rows is not new and on its own it is not worth much, because in most systems the
+        key that opens those rows is a short walk away from the rows themselves, in an environment
+        variable, in a managed key service the application is allowed to call, or in the memory of
+        the process that just handled the request. An attacker who can read your database can
+        usually also read the thing that decrypts it, which is why so many disclosures say the data
+        was encrypted at rest and it makes no difference to anyone affected.
+      </p>
+      <p>
+        Here the key exists as shares held by independent nodes, fourteen of twenty have to cooperate
+        to use it, and it is never assembled anywhere at any point, including on the machine running
+        minidauth. There is no environment variable to read and no service that will hand it over on
+        request.
+      </p>
+
+      <blockquote class="pull">A stolen copy of your database contains nothing readable, and no key to make it readable.</blockquote>
+
+      <h2>The half encryption cannot do</h2>
+      <p>
+        The same demo then asks the network to sign a payment instruction. Signing policies carry a
+        contract, and the contract is handed the payload before the cohort will put a signature on
+        it, so one of these comes back signed and the other does not:
+      </p>
+      <div class="code"><pre><span class="c">// signed by the cohort</span>
+amount=250;to=alice
+
+<span class="c">// refused, by fourteen nodes independently</span>
+amount=5000;to=alice</pre></div>
+      <p>
+        The refusal is the event worth watching, because it happens on fourteen machines that are not
+        yours, running code you did not deploy, reading the bytes you actually asked them to sign.
+        There is no sequence of events on your own server that produces that signature, since your
+        server was never what produced signatures in the first place. Approving a release,
+        authorising a refund above some limit, issuing a credential: all the same shape, and all
+        things that are normally enforced by a conditional in the application that wants the
+        operation to succeed.
+      </p>
+
+      <h2>What the demo does not claim</h2>
+      <p>
+        A demo that only shows the good part is a sales pitch, so the limits are worth stating in the
+        same breath.
+      </p>
+      <ul>
+        <li>
+          Whoever runs minidauth holds the vendor key and can ultimately authorise reads, and a
+          quorum of your own operators can grant themselves a reading role. Both are on purpose,
+          because access has to be recoverable. What goes away is any single party doing it alone.
+        </li>
+        <li>
+          Owning the host still means holding the vendor key. Signed grants stop silent forgery of
+          roles, but they do not stop someone with your machine acting within the policies you
+          deployed.
+        </li>
+        <li>
+          Reads that need decryption make a network call to a threshold of nodes, and sign-in does
+          too. If every page load in your app decrypts something, you will feel that.
+        </li>
+      </ul>
+
+      <h2>Where to go after it</h2>
+      <p>
+        The notes demo is deliberately the smallest thing that shows both halves working.
+        <a href="https://github.com/sashyo/minidauth/tree/main/examples/payouts">payouts</a> is the
+        same idea as an app somebody might actually ship, on Supabase, with login and Postgres and a
+        server holding a secret key: bank details stored as ciphertext, a reveal that takes a role
+        only a quorum can grant, and payouts that exist only because the network signed them. Edit an
+        amount directly in the Supabase table and the row shows as forged on the next load, which is
+        checked with plain Ed25519 and no special tooling.
+      </p>
+      <p>
+        If the users of your app should not have to hold a second account, and most of the time they
+        should not,
+        <a href="https://github.com/sashyo/minidauth/tree/main/examples/tideless">tideless</a> goes
+        the other way: a quorum grants a role to the user id you already have, and minidauth acts on
+        their behalf gated on that role, with no extra login anywhere and no token for them to carry.
+      </p>
+
+      <p style="margin-top:34px"><a class="btn" href="./">More posts</a></p>
+    </article>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

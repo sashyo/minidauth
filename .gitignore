@@ -12,4 +12,6 @@ target/
 *.png
 # except the recorded walkthroughs, which are the point of having them
 !examples/*/docs/*.png
+# and the screenshots the public site serves
+!site/assets/*.png
 vendor/
