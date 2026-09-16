@@ -13,3 +13,7 @@ target/
 # except the recorded walkthroughs, which are the point of having them
 !examples/*/docs/*.png
 vendor/
+
+.env
+data-tideless*/
+twenty-newperson.txt
