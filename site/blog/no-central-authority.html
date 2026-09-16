@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taking the central authority out of your app</title>
+<meta name="description" content="Every app has a party that can do anything: hold the key, mint the token, grant the role. Tide replaces that party with a threshold of independent nodes, which is what makes trust something a user can check instead of extend.">
+<link rel="canonical" href="https://dauth.me/blog/no-central-authority.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Taking the central authority out of your app">
+<meta property="og:description" content="Trust is not a promise you make. It is what is left after you remove the party who could break it.">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <article class="post">
+      <p class="label">Tide</p>
+      <h1>Taking the central authority out of your app</h1>
+      <div class="byline">
+        <time datetime="2026-09-16">16 September 2026</time><span>·</span><span>8 min</span>
+      </div>
+
+      <p class="lede">
+        Somewhere in your application there is a process that can read every row you store. It is
+        usually the same process that serves your API, and it can read everything either because it
+        holds the decryption key or because nothing was encrypted in the first place and the database
+        simply answers when asked. Anyone who ends up with a shell on that machine, a valid admin
+        session, or last night's backup along with the environment file that was sitting next to it,
+        gets whatever that process can get. This is not a mistake in how you built it. It is how
+        nearly everything is built, and for a long time the alternatives were not worth the trouble.
+      </p>
+
+      <h2>Four decisions, one party</h2>
+      <p>
+        When people talk about the central authority in an app they usually mean the admin account.
+        It is wider than that, and it gets easier to see if you write down the decisions that
+        actually matter and then ask who makes each one.
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>The decision</th><th>Who makes it today</th></tr></thead>
+          <tbody>
+            <tr><td>Who may read this data</td><td>the process holding the key, which is your app</td></tr>
+            <tr><td>Who is signed in</td><td>your auth system, which mints its own tokens</td></tr>
+            <tr><td>What role they hold</td><td>a row in your database, editable by whoever holds the database</td></tr>
+            <tr><td>What happened</td><td>a log written by the party the log is about</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Each of those has a standard answer that genuinely helps: put the key in a managed service,
+        turn on an audit trail, review the permissions matrix every quarter. What none of them change
+        is that the chain ends at a party who can authorise itself. A key management service hands
+        your app the key when your app asks, because your app is allowed to ask. A role check reads a
+        table that anyone holding the database can write. An audit log is written by the machine you
+        would be investigating.
+      </p>
+
+      <h2>What a user is actually being asked</h2>
+      <p>
+        So when somebody trusts an application with health records or bank details or legal files,
+        what they are really doing is believing a set of claims about other people's operational
+        habits. That the contractor's access was removed when the contract ended. That the support
+        engineer who can open any account does not open them out of curiosity. That the replica in
+        the other region is encrypted with a key which is not sitting beside it. Most of the time
+        those claims are true, and the people making them are not lying.
+      </p>
+      <p>
+        The trouble is that none of it can be checked from the outside, and the claims tend to fail
+        together rather than one at a time. The breach that actually happens is rarely an interesting
+        exploit. It is far more often a valid session belonging to someone who had more access than
+        the task in front of them needed, and in that case nothing was broken at all. The authority
+        did exactly what it is able to do, on behalf of the wrong person.
+      </p>
+
+      <blockquote class="pull">The cheapest way to never leak user data is to be unable to read it.</blockquote>
+
+      <h2>What Tide takes away</h2>
+      <p>
+        Tide is a network of independent nodes that hold shares of a key and will do cryptography on
+        your behalf without any of them, or you, ever holding the whole thing. Four specific
+        decisions move off your server as a result, and it is worth being precise about which ones,
+        because "decentralised" on its own means very little.
+      </p>
+
+      <h3>The key stops existing in one piece</h3>
+      <p>
+        It is not stored in a vault and it is not held by a service that hands it over on request. It
+        exists as shares across the network, and a threshold of nodes cooperate to use it, which in
+        the configuration minidauth ships against means fourteen out of twenty. Since there is no
+        moment where the whole key exists, there is no moment at which it can be stolen, and a copy
+        of your database taken on its worst possible day contains ciphertext and nothing that would
+        open it.
+      </p>
+
+      <h3>Signing stops happening on your server</h3>
+      <p>
+        Every sign-in token, every policy and every role grant is an EdDSA signature produced jointly
+        by a threshold of those nodes. None of it is signed locally, which is the reason that owning
+        the server does not let you forge a role or mint a token the network will accept. The server
+        was never the thing producing signatures, so taking it does not inherit the ability to
+        produce them.
+      </p>
+
+      <h3>Permission stops being a row you can edit</h3>
+      <p>
+        A role grant is filed by one administrator, approved by others inside their own enclaves, and
+        only then does the network sign the attestation units that make the role real. Each approval
+        is signed by and credited to the identity of the person who made it, so a quorum cannot
+        quietly collapse into one application server calling itself three times. The governance
+        console in minidauth shows two separate tallies for this reason, one counted locally and one
+        counted by the network, because the two are not worth the same and pretending otherwise would
+        hide the only number that matters.
+      </p>
+
+      <h3>The decision to read moves off your code path</h3>
+      <p>
+        Before the nodes will help decrypt anything they check the caller's role against a signed
+        policy, so your application cannot decide to read. It can ask, and it can be refused. The
+        same mechanism applies to signing, where the policy's contract is handed the payload first:
+        in the notes demo the cohort signs <code>amount=250;to=alice</code> and declines
+        <code>amount=5000;to=alice</code>, with fourteen nodes independently answering that it is over
+        the limit the policy will sign. Compromising the app does not get you that signature, because
+        the rule was never in the app.
+      </p>
+
+      <h2>Which is where trust becomes possible</h2>
+      <p>
+        This is the part that gets lost when threshold cryptography is filed under security
+        hardening. Lowering the damage from a breach is useful, but the more interesting change is in
+        what you are able to say to the people using your software.
+      </p>
+      <p>
+        You can tell someone you will not misuse their data, and they can either believe you or not,
+        and nothing about the arrangement helps them decide. Or you can tell them that reading their
+        record takes a role granted by a quorum and a policy enforced by nodes you do not run, which
+        is a claim about the shape of the system rather than about your intentions, and it is still
+        true on the day somebody walks off with your laptop. The second one is checkable by a person
+        who knows nothing about your on-call rotation.
+      </p>
+      <p>
+        It changes what you can hand your own staff, too. Support can be given tools that are
+        actually useful without also being given the ability to browse customer records, and the
+        difference between those two stops depending on a code review and everyone's good
+        intentions. A team of four can hold data that would normally need a security function behind
+        it, because one stolen laptop is no longer the whole story. And when a regulator asks how
+        access is controlled, the answer is a mechanism rather than a policy document describing
+        one.
+      </p>
+
+      <h2>What is still central</h2>
+      <p>
+        A post about removing authority is not worth much if it hides the authority that is left, so
+        here is what remains and why.
+      </p>
+      <ul>
+        <li>
+          Whoever runs minidauth holds the vendor key and can ultimately authorise reads, and a
+          quorum of your own operators can grant themselves a reading role. Both are deliberate,
+          because access has to be recoverable by someone, and a system where it is not is a system
+          that eventually destroys its own data.
+        </li>
+        <li>
+          Policy deployment is still gated by this service rather than by the network. That is on the
+          wrong side of the line and we say so in the docs, and on an existing vendor key it cannot
+          be moved, because the first policy's reach is permanent.
+        </li>
+        <li>
+          Owning the host still means holding the vendor key. Signed grants stop silent forgery of
+          roles, but they do not stop somebody with your machine acting within the policies you
+          already deployed.
+        </li>
+      </ul>
+      <p>
+        What goes away is any <strong>single</strong> party doing any of it alone, and in particular
+        the application, which is both the most likely thing to be compromised and the component with
+        the least business holding that much power.
+      </p>
+
+      <h2>The smallest way in</h2>
+      <p>
+        Until recently, using any of this meant adopting TideCloak, a Keycloak fork that implements
+        the whole model properly, which also means replacing your identity system. That is a large
+        first move for a team whose actual goal is for their database to stop being a single point of
+        failure. minidauth lifts the key lifecycle and the governance out of TideCloak and puts them
+        behind an ordinary HTTP service, so the login you have stays where it is and the fabric sits
+        beside it. In practice that is one column on your user record, one callback route, and asking
+        for roles instead of storing them:
+      </p>
+      <div class="code"><pre><span class="c">// before: your database decides</span>
+if (user.role === "admin") return decrypt(record);
+
+<span class="c">// after: the network decides, and can refuse</span>
+const roles = await minidauth.rolesFor(user.vuid);</pre></div>
+      <p>
+        That last line is the one that carries the argument. The role is not something your system
+        stores, so it is not something your system can grant itself, and an attacker who takes over
+        your server inherits your ability to ask rather than your ability to decide. If you later
+        need the full model, TideCloak runs on the same network and the same vendor key, so starting
+        here is not a branch you have to back out of.
+      </p>
+
+      <p style="margin-top:34px">
+        <a class="btn btn--primary" href="../#start">Try it in two commands</a>
+        <a class="btn" href="./">More posts</a>
+      </p>
+    </article>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -10,7 +10,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-111.svg"></a>
   <img alt="Java 17+" src="https://img.shields.io/badge/java-17%2B-111.svg">
-  <img alt="115 tests passing" src="https://img.shields.io/badge/tests-115%20passing-111.svg">
+  <img alt="124 tests passing" src="https://img.shields.io/badge/tests-124%20passing-111.svg">
 </p>
 
 Your app can already tell who someone is. What it cannot do is stop itself reading their data. The

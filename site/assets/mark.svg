@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"
+     role="img" aria-label="minidauth">
+  <!-- Six shares, none of them touching. The key is the shape they leave, not anything drawn, and
+       one is marked because a threshold acts rather than all of them. -->
+  <g fill="none" stroke-width="9" stroke-linecap="butt">
+    <path d="M 50.00 16.00 A 34.0 34.0 0 0 1 74.46 26.38" stroke="#0e0e0c"/>
+    <path d="M 79.44 33.00 A 34.0 34.0 0 0 1 82.68 59.37" stroke="#d6371c"/>
+    <path d="M 79.44 67.00 A 34.0 34.0 0 0 1 58.23 82.99" stroke="#0e0e0c"/>
+    <path d="M 50.00 84.00 A 34.0 34.0 0 0 1 25.54 73.62" stroke="#0e0e0c"/>
+    <path d="M 20.56 67.00 A 34.0 34.0 0 0 1 17.32 40.63" stroke="#0e0e0c"/>
+    <path d="M 20.56 33.00 A 34.0 34.0 0 0 1 41.77 17.01" stroke="#0e0e0c"/>
+  </g>
+
+  <!-- The keyhole, centred in the space the shares leave. -->
+  <circle cx="50" cy="45" r="8.5" fill="#0e0e0c"/>
+  <path d="M 45.5 50 L 54.5 50 L 57 68 L 43 68 Z" fill="#0e0e0c"/>
+</svg>
