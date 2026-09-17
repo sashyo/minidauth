@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clerk field-level encryption and roles · minidauth</title>
+<meta name="description" content="Keep Clerk for sign-in and add encryption, network signing and quorum-approved roles with minidauth. The key never sits on your server, and roles never go in a Clerk token.">
+<link rel="canonical" href="https://www.dauth.me/integrations/clerk/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Clerk field-level encryption and roles · minidauth">
+<meta property="og:description" content="Keep Clerk for sign-in and add encryption, network signing and quorum-approved roles with minidauth. The key never sits on your server, and roles never go in a Clerk token.">
+<meta property="og:url" content="https://www.dauth.me/integrations/clerk/">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Clerk field-level encryption and roles with minidauth",
+      "description": "Keep Clerk for sign-in and add encryption, network signing and quorum-approved roles with minidauth. The key never sits on your server, and roles never go in a Clerk token.",
+      "url": "https://www.dauth.me/integrations/clerk/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Clerk"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Integrations",
+          "item": "https://www.dauth.me/integrations/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Clerk",
+          "item": "https://www.dauth.me/integrations/clerk/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/" aria-current="page">Integrations</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Integrations</a> / Clerk</p>
+      <h1>Clerk + minidauth <span>keep your login, add keys nobody holds</span></h1>
+      <p class="lede">Clerk keeps the login, including its sign-in component. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/minidauth/tree/main/examples/clerk">Open the Clerk example</a>
+        <a class="btn" href="../../#start">Quick start</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="split">
+      <h2>What stays and what moves</h2>
+      <dl class="rows">
+        <div class="row">
+          <dt>Stays with Clerk</dt>
+          <dd>Accounts, sessions, passwords and the sign-in screen. Nothing about how your users log in changes.</dd>
+        </div>
+        <div class="row">
+          <dt>Moves to the network</dt>
+          <dd>The key that encrypts and signs, which exists only as shares that 14 of 20 independent nodes have to cooperate to use, and the decision about who holds a role, which takes several of your admins approving it.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="steps">
+      <h2>Adding it to a Clerk app</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Store the link in <code>privateMetadata.tideVuid</code></h3>
+            <p>Private metadata rather than public, because the browser should not be able to read or write the link.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Add one callback route</h3>
+            <p>The user links their Tide identity in a page served by the Tide network, which neither your app nor minidauth can see into. The shared <code>link.js</code> drop-in adds the routes; you tell it who is signed in and where to store the vuid.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Read roles from minidauth, not from Clerk</h3>
+            <p>Clerk metadata can be copied into a session token, which makes it tempting to keep roles there. A role in a token your app can mint is a role your app can grant itself, so the example reads roles from minidauth on every request instead.</p>
+          </div>
+        </li>
+      </ol>
+      <figure class="shot">
+        <img src="../../assets/clerk-linked.png" alt="A Clerk user linked to a Tide identity, with granted roles listed" width="900" height="260" loading="lazy">
+        <figcaption>A real Clerk user, linked to a Tide identity. The roles come from the quorum&#x27;s grant record, not from Clerk.</figcaption>
+      </figure>
+    </section>
+
+    <section id="notes">
+      <h2>Clerk development instances</h2>
+      <p>The Tide enclave returns to your app with a cross-site navigation, and on a Clerk development instance authenticateRequest can't identify the caller on that request (it answers dev-browser-missing). The example sets its own short-lived tide_link cookie, httpOnly and SameSite=Lax, when the link starts and reads it on the way back. It's a pattern worth keeping in production too.</p>
+    </section>
+
+    <section id="tideless">
+      <h2>Users without a Tide account</h2>
+      <p>
+        The Clerk example also mounts a <code>/tideless</code> page. There, the signed-in Clerk user
+        encrypts and decrypts with no Tide account at all: their Clerk user id is the subject, a
+        role the quorum granted that id is the gate, and the browser never holds a credential. It
+        needs a public, voucher-gated decrypt policy, which the
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">setup guide</a> covers.
+      </p>
+    </section>
+
+    <section id="run">
+      <h2>Run the example</h2>
+      <p>Run end to end against a real Clerk application and the public Tide network: sign in, link, and a protected page that reads its answer from the grant record.</p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+<pre>MINIDAUTH_OPS_TOKEN=&lt;ops token&gt; APP_URL=http://localhost:3003 \
+  node ../shared/register-callback.js
+
+npm install
+export CLERK_PUBLISHABLE_KEY=pk_test_...
+export CLERK_SECRET_KEY=sk_test_...
+export MINIDAUTH_TOKEN=dev-sample-app-token
+npm start                                   # http://localhost:3003</pre>
+      </div>
+      <p style="margin-top:24px">
+        minidauth itself has to be running first, with a vendor key created and its policies
+        deployed. The <a href="../../#start">quick start</a> is two Docker commands.
+      </p>
+      <p class="micro">Also works with: <a href="../auth0/">Auth0</a> · <a href="../supabase/">Supabase</a> · <a href="../cognito/">Amazon Cognito</a> · <a href="../better-auth/">Better Auth</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>

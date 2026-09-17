@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supabase field-level encryption and roles · minidauth</title>
+<meta name="description" content="Keep Supabase Auth and Postgres, and add field-level encryption, network signing and quorum-approved roles with minidauth. Rows hold ciphertext and roles never live in the JWT.">
+<link rel="canonical" href="https://www.dauth.me/integrations/supabase/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Supabase field-level encryption and roles · minidauth">
+<meta property="og:description" content="Keep Supabase Auth and Postgres, and add field-level encryption, network signing and quorum-approved roles with minidauth. Rows hold ciphertext and roles never live in the JWT.">
+<meta property="og:url" content="https://www.dauth.me/integrations/supabase/">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Supabase field-level encryption and roles with minidauth",
+      "description": "Keep Supabase Auth and Postgres, and add field-level encryption, network signing and quorum-approved roles with minidauth. Rows hold ciphertext and roles never live in the JWT.",
+      "url": "https://www.dauth.me/integrations/supabase/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Supabase"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Integrations",
+          "item": "https://www.dauth.me/integrations/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Supabase",
+          "item": "https://www.dauth.me/integrations/supabase/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/" aria-current="page">Integrations</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Integrations</a> / Supabase</p>
+      <h1>Supabase + minidauth <span>keep your login, add keys nobody holds</span></h1>
+      <p class="lede">Supabase keeps the login and the database. minidauth adds a key that no single server holds, so sensitive columns hold ciphertext, and roles that only a quorum of your admins can grant.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/minidauth/tree/main/examples/supabase">Open the Supabase example</a>
+        <a class="btn" href="../../#start">Quick start</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="split">
+      <h2>What stays and what moves</h2>
+      <dl class="rows">
+        <div class="row">
+          <dt>Stays with Supabase</dt>
+          <dd>Accounts, sessions, passwords and the sign-in screen. Nothing about how your users log in changes.</dd>
+        </div>
+        <div class="row">
+          <dt>Moves to the network</dt>
+          <dd>The key that encrypts and signs, which exists only as shares that 14 of 20 independent nodes have to cooperate to use, and the decision about who holds a role, which takes several of your admins approving it.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="steps">
+      <h2>Adding it to a Supabase app</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Store the link in <code>app_metadata.tide_vuid</code></h3>
+            <p>Written with the service role key. App metadata rather than user metadata, because a user can write their own user metadata.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Add one callback route</h3>
+            <p>The user links their Tide identity in a page served by the Tide network, which neither your app nor minidauth can see into. The shared <code>link.js</code> drop-in adds the routes; you tell it who is signed in and where to store the vuid.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Read roles from minidauth, not from Supabase</h3>
+            <p>Supabase copies app_metadata straight into the access token, so it is tempting to put roles there and read them from the JWT. A role in a token your project can mint is a role your project can grant itself, so the example reads roles from the grant record on every request, and no row you edit in Supabase changes the answer.</p>
+          </div>
+        </li>
+      </ol>
+      <figure class="shot">
+        <img src="../../assets/supabase-granted.png" alt="A Supabase user linked to a Tide identity, with granted roles listed" width="900" height="260" loading="lazy">
+        <figcaption>A real Supabase user, signed in again after linking. The roles are not in the Supabase token; they come from the grant record.</figcaption>
+      </figure>
+    </section>
+
+    <section id="notes">
+      <h2>Tokens issued before the link</h2>
+      <p>Because the access token carries app_metadata, a token issued before the user linked their Tide identity won't contain the vuid. The example asks the user to sign in again rather than pretending the token refreshed. For the demo, turn email confirmations off under Authentication, Providers, Email.</p>
+    </section>
+
+    <section id="more">
+      <h2>Two full apps on Supabase</h2>
+      <p>If you want more than a sign-in demo, two larger examples run on Supabase. <a href="https://github.com/sashyo/minidauth/tree/main/examples/payouts">payouts</a> keeps bank details as ciphertext and only moves money the network has signed, so editing an amount in Supabase makes the row show as forged. <a href="https://github.com/sashyo/minidauth/tree/main/examples/vault">vault</a> is a confidential client-records desk whose sensitive fields are sealed in the browser and revealed only for a granted role.</p>
+    </section>
+
+    <section id="tideless">
+      <h2>Users without a Tide account</h2>
+      <p>
+        The Supabase example also mounts a <code>/tideless</code> page. There, the signed-in Supabase user
+        encrypts and decrypts with no Tide account at all: their Supabase user id is the subject, a
+        role the quorum granted that id is the gate, and the browser never holds a credential. It
+        needs a public, voucher-gated decrypt policy, which the
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">setup guide</a> covers.
+      </p>
+    </section>
+
+    <section id="run">
+      <h2>Run the example</h2>
+      <p>Run end to end against a real Supabase project and the public Tide network, on the free tier with no card.</p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+<pre>MINIDAUTH_OPS_TOKEN=&lt;ops token&gt; APP_URL=http://localhost:3004 \
+  node ../shared/register-callback.js
+
+npm install
+export SUPABASE_URL=https://xxxx.supabase.co
+export SUPABASE_ANON_KEY=...
+export SUPABASE_SERVICE_ROLE_KEY=...        # server side only
+export MINIDAUTH_TOKEN=dev-sample-app-token
+npm start                                   # http://localhost:3004</pre>
+      </div>
+      <p style="margin-top:24px">
+        minidauth itself has to be running first, with a vendor key created and its policies
+        deployed. The <a href="../../#start">quick start</a> is two Docker commands.
+      </p>
+      <p class="micro">Also works with: <a href="../clerk/">Clerk</a> · <a href="../auth0/">Auth0</a> · <a href="../cognito/">Amazon Cognito</a> · <a href="../better-auth/">Better Auth</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>

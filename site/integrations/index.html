@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minidauth integrations: Clerk, Auth0, Supabase, Cognito, Better Auth</title>
+<meta name="description" content="Add threshold encryption, network signing and quorum-approved roles to Clerk, Auth0, Supabase, Amazon Cognito or Better Auth without replacing your login.">
+<link rel="canonical" href="https://www.dauth.me/integrations/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="minidauth integrations: Clerk, Auth0, Supabase, Cognito, Better Auth">
+<meta property="og:description" content="Add threshold encryption, network signing and quorum-approved roles to Clerk, Auth0, Supabase, Amazon Cognito or Better Auth without replacing your login.">
+<meta property="og:url" content="https://www.dauth.me/integrations/">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "minidauth integrations",
+  "url": "https://www.dauth.me/integrations/",
+  "hasPart": [
+    {
+      "@type": "TechArticle",
+      "name": "Clerk",
+      "url": "https://www.dauth.me/integrations/clerk/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Auth0",
+      "url": "https://www.dauth.me/integrations/auth0/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Supabase",
+      "url": "https://www.dauth.me/integrations/supabase/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Amazon Cognito",
+      "url": "https://www.dauth.me/integrations/cognito/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Better Auth",
+      "url": "https://www.dauth.me/integrations/better-auth/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../integrations/" aria-current="page">Integrations</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <h1>Works with the login <span>you already have</span></h1>
+      <p class="lede">
+        minidauth runs next to your identity provider. Your users keep signing in the way they do
+        today, and the key that encrypts and signs, along with the decision about who holds a
+        role, moves out of your servers.
+      </p>
+      <p>
+        The minidauth half is the same file in every integration. Each one is three steps: store
+        one field the user can't edit, add one callback route, and read roles from minidauth
+        instead of from your own tables.
+      </p>
+    </header>
+
+    <section id="providers">
+      <h2>Integrations</h2>
+      <div class="posts">
+        <a class="post-link" href="clerk/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>Clerk</h3>
+            <p>Clerk keeps the login, including its sign-in component. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant.</p>
+          </div>
+        </a>
+        <a class="post-link" href="auth0/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>Auth0</h3>
+            <p>Auth0 keeps the login. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant. The Auth0 token never carries a role.</p>
+          </div>
+        </a>
+        <a class="post-link" href="supabase/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>Supabase</h3>
+            <p>Supabase keeps the login and the database. minidauth adds a key that no single server holds, so sensitive columns hold ciphertext, and roles that only a quorum of your admins can grant.</p>
+          </div>
+        </a>
+        <a class="post-link" href="cognito/">
+          <time><span class="chip">Setup scripted</span></time>
+          <div>
+            <h3>Amazon Cognito</h3>
+            <p>Cognito keeps the login. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant. The Cognito token never carries a role.</p>
+          </div>
+        </a>
+        <a class="post-link" href="better-auth/">
+          <time><span class="chip">Runs locally</span></time>
+          <div>
+            <h3>Better Auth</h3>
+            <p>Better Auth keeps accounts, sessions and passwords, exactly as it would on its own. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant.</p>
+          </div>
+        </a>
+      </div>
+      <p style="margin-top:28px">
+        Not on this list? The same pattern works with anything that gives you a stable user id.
+        If you can't add a column, key the mapping on the id you already have.
+      </p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../integrations/">Integrations</a>
+        <a href="../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazon Cognito field-level encryption and roles · minidauth</title>
+<meta name="description" content="Keep Amazon Cognito for sign-in and add encryption, network signing and quorum-approved roles with minidauth. Roles stay out of Cognito tokens and the key never sits in your AWS account.">
+<link rel="canonical" href="https://www.dauth.me/integrations/cognito/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Amazon Cognito field-level encryption and roles · minidauth">
+<meta property="og:description" content="Keep Amazon Cognito for sign-in and add encryption, network signing and quorum-approved roles with minidauth. Roles stay out of Cognito tokens and the key never sits in your AWS account.">
+<meta property="og:url" content="https://www.dauth.me/integrations/cognito/">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Amazon Cognito field-level encryption and roles with minidauth",
+      "description": "Keep Amazon Cognito for sign-in and add encryption, network signing and quorum-approved roles with minidauth. Roles stay out of Cognito tokens and the key never sits in your AWS account.",
+      "url": "https://www.dauth.me/integrations/cognito/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Amazon Cognito"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Integrations",
+          "item": "https://www.dauth.me/integrations/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Amazon Cognito",
+          "item": "https://www.dauth.me/integrations/cognito/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/" aria-current="page">Integrations</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Integrations</a> / Amazon Cognito</p>
+      <h1>Amazon Cognito + minidauth <span>keep your login, add keys nobody holds</span></h1>
+      <p class="lede">Cognito keeps the login. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant. The Cognito token never carries a role.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/minidauth/tree/main/examples/cognito">Open the Amazon Cognito example</a>
+        <a class="btn" href="../../#start">Quick start</a>
+      </div>
+      <p class="micro"><span class="chip">Setup scripted</span></p>
+    </header>
+
+    <section id="split">
+      <h2>What stays and what moves</h2>
+      <dl class="rows">
+        <div class="row">
+          <dt>Stays with Amazon Cognito</dt>
+          <dd>Accounts, sessions, passwords and the sign-in screen. Nothing about how your users log in changes.</dd>
+        </div>
+        <div class="row">
+          <dt>Moves to the network</dt>
+          <dd>The key that encrypts and signs, which exists only as shares that 14 of 20 independent nodes have to cooperate to use, and the decision about who holds a role, which takes several of your admins approving it.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="steps">
+      <h2>Adding it to a Amazon Cognito app</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Store the link in <code>custom:tide_vuid</code></h3>
+            <p>A custom attribute on the user pool, written after the user links their Tide identity.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Add one callback route</h3>
+            <p>The user links their Tide identity in a page served by the Tide network, which neither your app nor minidauth can see into. The shared <code>link.js</code> drop-in adds the routes; you tell it who is signed in and where to store the vuid.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Read roles from minidauth, not from Amazon Cognito</h3>
+            <p>A Pre Token Generation trigger can add group claims to a Cognito token, and it is the obvious place to put roles. A role that arrives in a token your AWS account can mint is a role your AWS account can grant itself. If you copy anything into the token, copy only the vuid, and let the example read roles from minidauth on every request.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="notes">
+      <h2>What setup creates</h2>
+      <p>A user pool with email sign-in and a tide_vuid attribute, an app client using the authorization code grant with openid and email, a hosted UI domain, and the callback registration with minidauth. It writes everything to .env and reuses it on the next run. npm run teardown removes the pool and domain again. The app's minidauth operator only needs the relying-party role, which can start and finish a sign-in and read grants, and nothing else.</p>
+    </section>
+
+    <section id="tideless">
+      <h2>Users without a Tide account</h2>
+      <p>
+        The Amazon Cognito example also mounts a <code>/tideless</code> page. There, the signed-in Amazon Cognito user
+        encrypts and decrypts with no Tide account at all: their Amazon Cognito user id is the subject, a
+        role the quorum granted that id is the gate, and the browser never holds a credential. It
+        needs a public, voucher-gated decrypt policy, which the
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">setup guide</a> covers.
+      </p>
+    </section>
+
+    <section id="run">
+      <h2>Run the example</h2>
+      <p>npm run setup builds the whole Cognito side for you. The example shares its minidauth code with the others; it has not yet been run against a real user pool.</p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+<pre>npm install
+AWS_REGION=ap-southeast-2 MINIDAUTH_OPS_TOKEN=&lt;ops token&gt; npm run setup
+npm start                                   # http://localhost:3001
+
+npm run teardown                            # when you&#x27;re finished</pre>
+      </div>
+      <p style="margin-top:24px">
+        minidauth itself has to be running first, with a vendor key created and its policies
+        deployed. The <a href="../../#start">quick start</a> is two Docker commands.
+      </p>
+      <p class="micro">Also works with: <a href="../clerk/">Clerk</a> · <a href="../auth0/">Auth0</a> · <a href="../supabase/">Supabase</a> · <a href="../better-auth/">Better Auth</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>

@@ -48,6 +48,18 @@ npx --yes @azure/static-web-apps-cli deploy ./site --deployment-token "$TOKEN" -
 
 Leave off `--env production` to get a temporary preview URL instead of publishing to dauth.me.
 
+## Integration pages
+
+`integrations/` and `sitemap.xml` are generated, because the six pages share one layout and differ
+only in provider facts. Edit `tools/site/gen_integrations.py`, where every fact is taken from
+`examples/<provider>/README.md`, then run it from the repo root:
+
+```sh
+python3 tools/site/gen_integrations.py site
+```
+
+Add a new blog post to the list at the bottom of that script too, so it lands in the sitemap.
+
 ## Adding a post
 
 Copy an existing file in `blog/`, replace the article, and add an entry to the list in

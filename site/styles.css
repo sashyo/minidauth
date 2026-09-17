@@ -149,12 +149,13 @@ section > h2::before {
 
 /* status chips on the projects list */
 .chip {
-  display: block; width: max-content; margin: 8px 0 0 18px; padding: 3px 8px; border-radius: 1px;
+  display: inline-block; padding: 3px 8px; border-radius: 1px;
   font-family: "IBM Plex Mono", monospace; font-size: .58rem; letter-spacing: .14em;
   text-transform: uppercase;
   background: var(--ground); color: var(--ink-3); box-shadow: var(--press);
 }
 .chip--live { color: #fff; background: var(--deep); box-shadow: none; }
+.rows dt .chip { display: block; width: max-content; margin: 8px 0 0 18px; }
 
 /* ---------- numbered steps: the one place order matters ---------- */
 

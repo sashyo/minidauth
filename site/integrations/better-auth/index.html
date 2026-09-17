@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Better Auth field-level encryption and roles · minidauth</title>
+<meta name="description" content="Keep Better Auth for accounts, sessions and passwords, and add encryption, network signing and quorum-approved roles with minidauth, with one extra field on the user table.">
+<link rel="canonical" href="https://www.dauth.me/integrations/better-auth/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Better Auth field-level encryption and roles · minidauth">
+<meta property="og:description" content="Keep Better Auth for accounts, sessions and passwords, and add encryption, network signing and quorum-approved roles with minidauth, with one extra field on the user table.">
+<meta property="og:url" content="https://www.dauth.me/integrations/better-auth/">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Better Auth field-level encryption and roles with minidauth",
+      "description": "Keep Better Auth for accounts, sessions and passwords, and add encryption, network signing and quorum-approved roles with minidauth, with one extra field on the user table.",
+      "url": "https://www.dauth.me/integrations/better-auth/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Better Auth"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Integrations",
+          "item": "https://www.dauth.me/integrations/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Better Auth",
+          "item": "https://www.dauth.me/integrations/better-auth/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/" aria-current="page">Integrations</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Integrations</a> / Better Auth</p>
+      <h1>Better Auth + minidauth <span>keep your login, add keys nobody holds</span></h1>
+      <p class="lede">Better Auth keeps accounts, sessions and passwords, exactly as it would on its own. minidauth adds a key that no single server holds and roles that only a quorum of your admins can grant.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/minidauth/tree/main/examples/better-auth">Open the Better Auth example</a>
+        <a class="btn" href="../../#start">Quick start</a>
+      </div>
+      <p class="micro"><span class="chip">Runs locally</span></p>
+    </header>
+
+    <section id="split">
+      <h2>What stays and what moves</h2>
+      <dl class="rows">
+        <div class="row">
+          <dt>Stays with Better Auth</dt>
+          <dd>Accounts, sessions, passwords and the sign-in screen. Nothing about how your users log in changes.</dd>
+        </div>
+        <div class="row">
+          <dt>Moves to the network</dt>
+          <dd>The key that encrypts and signs, which exists only as shares that 14 of 20 independent nodes have to cooperate to use, and the decision about who holds a role, which takes several of your admins approving it.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="steps">
+      <h2>Adding it to a Better Auth app</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Store the link in <code>tideVuid on the user table, input: false</code></h3>
+            <p>One extra field in auth.js, marked so the user can't set it. Everything else about authentication is untouched.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Add one callback route</h3>
+            <p>The user links their Tide identity in a page served by the Tide network, which neither your app nor minidauth can see into. The shared <code>link.js</code> drop-in adds the routes; you tell it who is signed in and where to store the vuid.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Read roles from minidauth, not from Better Auth</h3>
+            <p>The example's protected route reads roles from minidauth on every request, not from its own database, so editing app.db lets nobody in. Keep the Tide token in the session rather than the database.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="notes">
+      <h2>A callback that can't be forged into a link</h2>
+      <p>minidauth verifies the enclave's blind signature before it answers, so the vuid is proven rather than claimed. What the app still has to check is that a reply belongs to a sign-in it started, for the account that started it; the example does this with a short-lived map and refuses anything else.</p>
+    </section>
+
+    <section id="tideless">
+      <h2>Users without a Tide account</h2>
+      <p>
+        The Better Auth example also mounts a <code>/tideless</code> page. There, the signed-in Better Auth user
+        encrypts and decrypts with no Tide account at all: their Better Auth user id is the subject, a
+        role the quorum granted that id is the gate, and the browser never holds a credential. It
+        needs a public, voucher-gated decrypt policy, which the
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">setup guide</a> covers.
+      </p>
+    </section>
+
+    <section id="run">
+      <h2>Run the example</h2>
+      <p>Runs locally and has been exercised against the live Tide network.</p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+<pre># minidauth running, with a vendor key and its policies deployed,
+# this app&#x27;s callback registered, and a relying-party operator in operators.json
+
+npm install
+npx @better-auth/cli migrate --yes
+npm start                                   # http://localhost:3000</pre>
+      </div>
+      <p style="margin-top:24px">
+        minidauth itself has to be running first, with a vendor key created and its policies
+        deployed. The <a href="../../#start">quick start</a> is two Docker commands.
+      </p>
+      <p class="micro">Also works with: <a href="../clerk/">Clerk</a> · <a href="../auth0/">Auth0</a> · <a href="../supabase/">Supabase</a> · <a href="../cognito/">Amazon Cognito</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>
