@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot</title>
-<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III</title>
+<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot and Firefly III where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <link rel="canonical" href="https://www.dauth.me/projects/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot">
-<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III">
+<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot and Firefly III where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <meta property="og:url" content="https://www.dauth.me/projects/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -65,6 +65,11 @@
       "@type": "TechArticle",
       "name": "Chatwoot",
       "url": "https://www.dauth.me/projects/chatwoot/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Firefly III",
+      "url": "https://www.dauth.me/projects/firefly/"
     }
   ]
 }
@@ -147,6 +152,13 @@
           <div>
             <h3>Chatwoot</h3>
             <p>A support tool holds who your customers are and everything they told your team. In this fork of Chatwoot, the open source Zendesk alternative, a contact's name and phone and the body of every message are sealed before they reach Postgres, and open only for an agent a quorum granted the reading role. It is the first non-Node integration, proving the sealing sidecar is language-agnostic.</p>
+          </div>
+        </a>
+        <a class="post-link" href="firefly/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>Firefly III</h3>
+            <p>A personal finance manager knows who you pay, how to reach them and what every transaction was for. In this fork of Firefly III, those fields are sealed before they reach the database, and open only for a user a quorum granted the reading role. The numbers a budgeting app has to add up stay in the clear, so reports and charts are untouched. It is a second non-Node integration, in PHP and Laravel, further proving the sealing sidecar is language-agnostic.</p>
           </div>
         </a>
       </div>

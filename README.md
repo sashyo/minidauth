@@ -77,6 +77,7 @@ write-ups, with how each is wired, at [dauth.me/projects](https://www.dauth.me/p
 | [Medusa](https://www.dauth.me/projects/medusa/) ([fork](https://github.com/sashyo/medusa)) | E-commerce (Shopify alternative) | Customer names, phones and companies, and the names, phones and street lines on addresses |
 | [Rocket.Chat](https://www.dauth.me/projects/rocketchat/) ([fork](https://github.com/sashyo/Rocket.Chat)) | Team chat (Slack alternative) | The body of every message, sealed in MongoDB and opened per member over history and in real time |
 | [Chatwoot](https://www.dauth.me/projects/chatwoot/) ([fork](https://github.com/sashyo/chatwoot)) | Customer support (Zendesk alternative) | Contact names and phones, and the body of every support message — the first non-Node (Ruby on Rails) integration |
+| [Firefly III](https://www.dauth.me/projects/firefly/) ([fork](https://github.com/sashyo/firefly-iii)) | Personal finance manager | Payee names, IBANs, transaction descriptions and notes, sealed in PHP/Laravel while balances stay in the clear so reports still work |
 
 Adding it to something else? [Join the Discord](https://discord.gg/XBMd9ny2q5) and I'll help you wire it.
 

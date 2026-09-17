@@ -520,6 +520,26 @@ PROJ = [
                    "The tool's derived, pre-rendered copy of a message is dropped on write, so it can't shadow the sealed value."],
         status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Chatwoot.",
     ),
+    dict(
+        slug="firefly", name="Firefly III", kind="the open source personal finance manager",
+        upstream="firefly-iii/firefly-iii", fork="sashyo/firefly-iii",
+        run_url="https://github.com/sashyo/firefly-iii/tree/minidauth-sealing",
+        title="Sealed accounts and transactions for Firefly III · minidauth",
+        desc="A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.",
+        tagline="a budget file that reveals nothing if it is stolen",
+        lede="A personal finance manager knows who you pay, how to reach them and what every transaction was for. In this fork of Firefly III, those fields are sealed before they reach the database, and open only for a user a quorum granted the reading role. The numbers a budgeting app has to add up stay in the clear, so reports and charts are untouched. It is a second non-Node integration, in PHP and Laravel, further proving the sealing sidecar is language-agnostic.",
+        sealed=[("Accounts", "Payee and account names, and IBANs. The numeric balance stays in the clear so totals still add up."),
+                ("Transactions", "The description of each transaction journal."),
+                ("Notes", "The free-text note attached to an account or a transaction.")],
+        wiring=[("Sealed on write", "An Eloquent trait seals the declared fields in the model's saving() event, so every write of an account, transaction or note goes through one place, and ciphertext is what reaches the database."),
+                ("Opened per user", "The same trait's retrieved() event opens the fields as the signed-in user Laravel already tracks, then resyncs the attribute so an opened value is never written back as plaintext."),
+                ("Gated by a quorum role", "A field opens only if minidauth's quorum grant says that user holds the reading role. Revoke it and the user sees their own account name as ciphertext, with no change to Firefly III or its login.")],
+        hardening=["The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.",
+                   "With no reader in the request, a field simply stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.",
+                   "The PHP side signs its short-lived reader token with a private Ed25519 key rather than a shared secret, so a copy of a config file is worthless.",
+                   "Numeric amounts and balances are never sealed, so budgets, reports and charts keep working exactly as upstream."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Firefly III.",
+    ),
 ]
 
 

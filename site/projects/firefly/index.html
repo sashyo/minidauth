@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Encrypted and quorum-signed documents for Documenso · minidauth</title>
-<meta name="description" content="A Documenso fork where document titles, recipient names and signatures are sealed before they reach Postgres, open only for a signed-in user holding a quorum-granted role, and each completion is threshold-signed by the Tide ORK cohort.">
-<link rel="canonical" href="https://www.dauth.me/projects/documenso/">
+<title>Sealed accounts and transactions for Firefly III · minidauth</title>
+<meta name="description" content="A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.">
+<link rel="canonical" href="https://www.dauth.me/projects/firefly/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Encrypted and quorum-signed documents for Documenso · minidauth">
-<meta property="og:description" content="A Documenso fork where document titles, recipient names and signatures are sealed before they reach Postgres, open only for a signed-in user holding a quorum-granted role, and each completion is threshold-signed by the Tide ORK cohort.">
-<meta property="og:url" content="https://www.dauth.me/projects/documenso/">
+<meta property="og:title" content="Sealed accounts and transactions for Firefly III · minidauth">
+<meta property="og:description" content="A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.">
+<meta property="og:url" content="https://www.dauth.me/projects/firefly/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -30,9 +30,9 @@
   "@graph": [
     {
       "@type": "TechArticle",
-      "headline": "Encrypted and quorum-signed documents for Documenso",
-      "description": "A Documenso fork where document titles, recipient names and signatures are sealed before they reach Postgres, open only for a signed-in user holding a quorum-granted role, and each completion is threshold-signed by the Tide ORK cohort.",
-      "url": "https://www.dauth.me/projects/documenso/",
+      "headline": "Sealed accounts and transactions for Firefly III",
+      "description": "A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.",
+      "url": "https://www.dauth.me/projects/firefly/",
       "about": [
         {
           "@type": "SoftwareApplication",
@@ -40,8 +40,8 @@
         },
         {
           "@type": "SoftwareSourceCode",
-          "name": "Documenso",
-          "codeRepository": "https://github.com/sashyo/documenso"
+          "name": "Firefly III",
+          "codeRepository": "https://github.com/sashyo/firefly-iii"
         }
       ]
     },
@@ -63,8 +63,8 @@
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Documenso",
-          "item": "https://www.dauth.me/projects/documenso/"
+          "name": "Firefly III",
+          "item": "https://www.dauth.me/projects/firefly/"
         }
       ]
     }
@@ -91,35 +91,31 @@
   <main>
 
     <header class="hero">
-      <p class="label"><a href="../">Projects</a> / Documenso</p>
-      <h1>Documenso + minidauth <span>documents sealed at rest, opened for the reader, signed by a quorum</span></h1>
-      <p class="lede">A signed document is a promise, and the database that holds it knows the parties, the terms and the signatures. In this fork of Documenso, the open source DocuSign alternative, those fields are sealed before they reach Postgres, open only for a signed-in user a quorum granted the role, and each completion is threshold-signed by the Tide network so no operator can forge it.</p>
+      <p class="label"><a href="../">Projects</a> / Firefly III</p>
+      <h1>Firefly III + minidauth <span>a budget file that reveals nothing if it is stolen</span></h1>
+      <p class="lede">A personal finance manager knows who you pay, how to reach them and what every transaction was for. In this fork of Firefly III, those fields are sealed before they reach the database, and open only for a user a quorum granted the reading role. The numbers a budgeting app has to add up stay in the clear, so reports and charts are untouched. It is a second non-Node integration, in PHP and Laravel, further proving the sealing sidecar is language-agnostic.</p>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="https://github.com/sashyo/documenso">Open the fork</a>
-        <a class="btn" href="https://github.com/documenso/documenso">Upstream Documenso</a>
+        <a class="btn btn--primary" href="https://github.com/sashyo/firefly-iii">Open the fork</a>
+        <a class="btn" href="https://github.com/firefly-iii/firefly-iii">Upstream Firefly III</a>
       </div>
       <p class="micro"><span class="chip chip--live">Run end to end</span></p>
     </header>
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Documenso is the open source DocuSign alternative. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <p>Firefly III is the open source personal finance manager. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
-          <dt>Documents</dt>
-          <dd>Title.</dd>
+          <dt>Accounts</dt>
+          <dd>Payee and account names, and IBANs. The numeric balance stays in the clear so totals still add up.</dd>
         </div>
         <div class="row">
-          <dt>Recipients</dt>
-          <dd>Name.</dd>
+          <dt>Transactions</dt>
+          <dd>The description of each transaction journal.</dd>
         </div>
         <div class="row">
-          <dt>Emails to signers</dt>
-          <dd>Subject and message.</dd>
-        </div>
-        <div class="row">
-          <dt>Signatures and fields</dt>
-          <dd>The typed or drawn signature, and the text a signer entered.</dd>
+          <dt>Notes</dt>
+          <dd>The free-text note attached to an account or a transaction.</dd>
         </div>
       </dl>
     </section>
@@ -130,51 +126,46 @@
         <li>
           <div>
             <h3>Sealed on write</h3>
-            <p>A Prisma client extension seals the chosen fields before they reach Postgres and opens them again on the way out.</p>
+            <p>An Eloquent trait seals the declared fields in the model&#x27;s saving() event, so every write of an account, transaction or note goes through one place, and ciphertext is what reaches the database.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Opened per user</h3>
-            <p>Each authenticated request runs as its signed-in user; a recipient opening a signing link opens the document on the owner&#x27;s reading authority once their token is verified.</p>
+            <p>The same trait&#x27;s retrieved() event opens the fields as the signed-in user Laravel already tracks, then resyncs the attribute so an opened value is never written back as plaintext.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>A field opens only if minidauth&#x27;s quorum grant says that user holds the reading role. Revoke it and the same view goes dark.</p>
-          </div>
-        </li>
-        <li>
-          <div>
-            <h3>Signed by a quorum</h3>
-            <p>On completion the Tide ORK cohort threshold-signs a statement about who signed what and when. The signature verifies against the vendor key; edit the row and it stops verifying.</p>
+            <p>A field opens only if minidauth&#x27;s quorum grant says that user holds the reading role. Revoke it and the user sees their own account name as ciphertext, with no change to Firefly III or its login.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
         The key that seals these fields exists only as shares across the Tide network, and 14 of 20
-        nodes have to cooperate to use it. It is never on the Documenso server.
+        nodes have to cooperate to use it. It is never on the Firefly III server.
       </p>
     </section>
 
     <section id="hardening">
       <h2>Details that matter</h2>
       <ul class="prose">
-        <li>The sidecar holds no reading identity and no signing key of its own. Opening and signing are delegated per user and gated on a quorum-granted role.</li>
-        <li>With no reader in the request, a field simply stays sealed, so there&#x27;s never an open decryption service to abuse. Signing is best-effort and never blocks a person from signing.</li>
-        <li>Every inbound value is sealed, so plaintext never reaches a sealed column. Every completed signature is verifiable against the vendor key, and tampering the stored row breaks it.</li>
+        <li>The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.</li>
+        <li>With no reader in the request, a field simply stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.</li>
+        <li>The PHP side signs its short-lived reader token with a private Ed25519 key rather than a shared secret, so a copy of a config file is worthless.</li>
+        <li>Numeric amounts and balances are never sealed, so budgets, reports and charts keep working exactly as upstream.</li>
       </ul>
     </section>
 
     <section id="status">
       <h2>Status and running it</h2>
-      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Documenso. The fork's <a href="https://github.com/sashyo/documenso">README</a> covers setup against a running minidauth.</p>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Firefly III. The fork's <a href="https://github.com/sashyo/firefly-iii/tree/minidauth-sealing">README</a> covers setup against a running minidauth.</p>
       <p>
         Want to do the same for another app, or stuck running this one?
         <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
       </p>
-      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../firefly/">Firefly III</a> · <a href="../../integrations/">Integrations</a></p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../../integrations/">Integrations</a></p>
     </section>
 
     <footer>
