@@ -61,6 +61,23 @@ the policy's contract before the cohort will sign, so the network can decline. T
 sign". That refusal happens where your code does not run, so owning your server does not produce the
 signature anyway. Approving a release, authorising a refund, issuing a credential: same shape.
 
+## Projects minidauth'd
+
+Open source apps forked to seal their most sensitive data before it reaches Postgres, so the app and
+its database only ever hold `ms1:` ciphertext and only a quorum-granted role can read it. Each is off
+unless `MINIDAUTH_SEAL_URL` is set, so an unconfigured checkout behaves exactly like upstream. Full
+write-ups, with how each is wired, at [dauth.me/projects](https://www.dauth.me/projects/).
+
+| Project | What it is | What gets sealed |
+|---|---|---|
+| [Twenty](https://www.dauth.me/projects/twenty/) | CRM | Every personal field on a contact, decrypted in the browser so the server never sees plaintext |
+| [Cal.diy](https://www.dauth.me/projects/cal/) ([fork](https://github.com/sashyo/cal.diy)) | Scheduling (Cal.com) | Attendee names and phone numbers, booking titles and descriptions |
+| [Formbricks](https://www.dauth.me/projects/formbricks/) ([fork](https://github.com/sashyo/formbricks)) | Surveys | The answers people submit |
+| [Documenso](https://www.dauth.me/projects/documenso/) ([fork](https://github.com/sashyo/documenso)) | E-signature (DocuSign alternative) | Document titles, recipient names, signer emails and the signatures themselves — and each completion is threshold-signed by the cohort, so no operator can forge it |
+| Medusa ([fork](https://github.com/sashyo/medusa)) _(in progress)_ | E-commerce (Shopify alternative) | Customer names, phones and companies, and the names, phones and street lines on addresses |
+
+Adding it to something else? [Join the Discord](https://discord.gg/XBMd9ny2q5) and I'll help you wire it.
+
 ## Quick start
 
 ```sh
