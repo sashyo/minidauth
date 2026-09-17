@@ -74,7 +74,7 @@ write-ups, with how each is wired, at [dauth.me/projects](https://www.dauth.me/p
 | [Cal.diy](https://www.dauth.me/projects/cal/) ([fork](https://github.com/sashyo/cal.diy)) | Scheduling (Cal.com) | Attendee names and phone numbers, booking titles and descriptions |
 | [Formbricks](https://www.dauth.me/projects/formbricks/) ([fork](https://github.com/sashyo/formbricks)) | Surveys | The answers people submit |
 | [Documenso](https://www.dauth.me/projects/documenso/) ([fork](https://github.com/sashyo/documenso)) | E-signature (DocuSign alternative) | Document titles, recipient names, signer emails and the signatures themselves — and each completion is threshold-signed by the cohort, so no operator can forge it |
-| Medusa ([fork](https://github.com/sashyo/medusa)) _(in progress)_ | E-commerce (Shopify alternative) | Customer names, phones and companies, and the names, phones and street lines on addresses |
+| [Medusa](https://www.dauth.me/projects/medusa/) ([fork](https://github.com/sashyo/medusa)) | E-commerce (Shopify alternative) | Customer names, phones and companies, and the names, phones and street lines on addresses |
 
 Adding it to something else? [Join the Discord](https://discord.gg/XBMd9ny2q5) and I'll help you wire it.
 

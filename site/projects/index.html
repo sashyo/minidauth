@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy</title>
-<meta name="description" content="Forks of Formbricks, Twenty and Cal.diy (Cal.com) where sensitive fields are sealed before they reach Postgres and only a quorum-granted role can read them.">
+<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa</title>
+<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso and Medusa (Cal.com) where sensitive fields are sealed before they reach Postgres and only a quorum-granted role can read them.">
 <link rel="canonical" href="https://www.dauth.me/projects/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy">
-<meta property="og:description" content="Forks of Formbricks, Twenty and Cal.diy (Cal.com) where sensitive fields are sealed before they reach Postgres and only a quorum-granted role can read them.">
+<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa">
+<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso and Medusa (Cal.com) where sensitive fields are sealed before they reach Postgres and only a quorum-granted role can read them.">
 <meta property="og:url" content="https://www.dauth.me/projects/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -50,6 +50,11 @@
       "@type": "TechArticle",
       "name": "Documenso",
       "url": "https://www.dauth.me/projects/documenso/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Medusa",
+      "url": "https://www.dauth.me/projects/medusa/"
     }
   ]
 }
@@ -111,6 +116,13 @@
           <div>
             <h3>Documenso</h3>
             <p>A signed document knows the parties, the terms and the signatures. In this fork of the open source DocuSign alternative, those fields are sealed before they reach Postgres, opened only for a quorum-granted reader, and each completion is threshold-signed by the Tide network so no operator can forge it.</p>
+          </div>
+        </a>
+        <a class="post-link" href="medusa/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>Medusa</h3>
+            <p>A commerce database is the classic breach: names, addresses and phone numbers. In this fork of the open source Shopify alternative, that personal data is sealed before it reaches Postgres and opens only for a staff member a quorum granted the reading role.</p>
           </div>
         </a>
       </div>
