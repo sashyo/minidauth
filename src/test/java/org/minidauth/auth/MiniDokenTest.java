@@ -74,7 +74,7 @@ class MiniDokenTest {
     }
 
     private String token() {
-        return verifier.mint("reader", Base64.getEncoder().encodeToString(key.getPublic().getEncoded()), "crm-reader");
+        return verifier.mint("reader", Base64.getEncoder().encodeToString(key.getPublic().getEncoded()), "crm-reader", null);
     }
 
     private String proof(String timestamp, String nonce, String request) throws Exception {

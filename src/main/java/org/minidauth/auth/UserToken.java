@@ -111,11 +111,12 @@ public final class UserToken {
 
         String uid = str(claims, uidClaim);
         if (uid == null || uid.isBlank()) throw new Invalid("The user token names no user (" + uidClaim + ")");
-        return new Verified(uid, str(claims, "cnf"));
+        return new Verified(uid, str(claims, "cnf"), str(claims, "sid"));
     }
 
-    /** A verified user token: the user id, and the session key it is bound to (cnf), if any. */
-    public record Verified(String uid, String cnf) {}
+    /** A verified user token: the user id, the session key it is bound to (cnf) if any, and the app
+     *  session id (sid) it belongs to, so the app can revoke the session at logout. */
+    public record Verified(String uid, String cnf, String sid) {}
 
     private boolean audienceMatches(Map<String, Object> claims) {
         Object aud = claims.get("aud");

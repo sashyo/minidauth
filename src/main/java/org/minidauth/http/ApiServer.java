@@ -49,6 +49,9 @@ public final class ApiServer implements AutoCloseable {
     // and a doken captured just before logout is only usable for this window. The browser re-mints
     // transparently when a read finds the doken expired, so a short TTL costs a re-mint, not a failure.
     private final org.minidauth.auth.MiniDoken miniDoken = new org.minidauth.auth.MiniDoken(30);
+    // Revoked app sessions. Retention comfortably exceeds the reader-token + doken lifetime, so a sid
+    // stays blocked until every token that could carry it has expired, then is swept.
+    private final org.minidauth.auth.Revocations revocations = new org.minidauth.auth.Revocations(120);
     private final VendorKeyStore keyStore;
     private final VrkLifecycle vrk;
     private final RotationScheduler rotation;
@@ -498,10 +501,29 @@ public final class ApiServer implements AutoCloseable {
             if (!verified.cnf().equals(sessionKey)) {
                 throw new Json.HttpError(403, "This user token is bound to a different session key");
             }
+            // If the app has signed this session out, refuse to mint a new doken for it: a token captured
+            // just before logout cannot be used to bootstrap a fresh doken afterwards.
+            if (revocations.isRevoked(verified.sid())) {
+                throw new Json.HttpError(401, "This session has been signed out");
+            }
             // The minting app (through its sidecar) pins the role scope; the doken then only ever
             // vouchers for that role, so a caller cannot later change it to reach another role's data.
             String role = Json.string(body, "role");
-            Json.send(ex, 200, Map.of("userDoken", miniDoken.mint(verified.uid(), sessionKey, role)));
+            // Carry the session id into the doken so revoking the session also kills its dokens.
+            Json.send(ex, 200, Map.of("userDoken", miniDoken.mint(verified.uid(), sessionKey, role, verified.sid())));
+        });
+
+        /* Revoke an application session (Level 2). The app calls this when a user signs out, passing the
+         * same server-derived session id (sid) its reader tokens carry. From then on this service refuses
+         * to mint a doken for that sid and refuses any voucher whose doken carries it, so decryption stops
+         * at logout instead of lingering until the short-lived tokens expire. The app authenticates as
+         * ever, and the sid is server-derived (never a value a browser supplies), so a caller cannot use
+         * this to sign out someone else. */
+        router.post("/vault/revoke", (ex, p) -> {
+            authenticate(ex);
+            Map<String, Object> body = Json.readBody(ex);
+            revocations.revoke(Json.requireString(body, "sid"));
+            Json.send(ex, 200, Map.of("revoked", true));
         });
 
         /* Issue a decrypt voucher on behalf of an application user who has no Tide identity.
@@ -731,6 +753,10 @@ public final class ApiServer implements AutoCloseable {
                         ex.getRequestHeaders().getFirst("X-Tide-PoP"));
             } catch (org.minidauth.auth.MiniDoken.Invalid e) {
                 throw new Json.HttpError(401, e.getMessage());
+            }
+            // A doken from a signed-out session is refused at once, without waiting for it to expire.
+            if (revocations.isRevoked(parsed.sid())) {
+                throw new Json.HttpError(401, "This session has been signed out");
             }
             requireUidMatches(body, parsed.uid());
             // The doken pins the role: the caller cannot swap in a different one to reach data a

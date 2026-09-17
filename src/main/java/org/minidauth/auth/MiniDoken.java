@@ -73,19 +73,23 @@ public final class MiniDoken {
         public Invalid(String message) { super(message); }
     }
 
-    /** What a verified mini-doken carries. */
-    public record Parsed(String uid, String sessionKeyB64, String role) {}
+    /** What a verified mini-doken carries. {@code sid} is the app session it was minted for, so the app
+     *  can revoke every doken of a session at logout; null on a doken minted without one. */
+    public record Parsed(String uid, String sessionKeyB64, String role, String sid) {}
 
     /** Mint a token binding {@code uid} to the client's Ed25519 session public key (SPKI, base64) and
      *  to a single {@code role} scope, set by the minting app. The role is then not something the
-     *  caller can change at voucher time: a doken scoped to one role cannot request another. */
-    public String mint(String uid, String sessionKeyB64, String role) {
+     *  caller can change at voucher time: a doken scoped to one role cannot request another. {@code sid}
+     *  carries the app session so the app can revoke it at logout; pass null to mint without one. */
+    public String mint(String uid, String sessionKeyB64, String role, String sid) {
         long now = clock.instant().getEpochSecond();
         String header = B64URL.encodeToString("{\"alg\":\"HS256\",\"typ\":\"mdk\"}".getBytes(StandardCharsets.US_ASCII));
+        Map<String, Object> claimMap = new HashMap<>(Map.of(
+                "sub", uid, "cnf", sessionKeyB64, "role", role == null ? "" : role, "iat", now, "exp", now + ttlSeconds));
+        if (sid != null && !sid.isBlank()) claimMap.put("sid", sid);
         String claims;
         try {
-            claims = B64URL.encodeToString(MAPPER.writeValueAsBytes(Map.of(
-                    "sub", uid, "cnf", sessionKeyB64, "role", role == null ? "" : role, "iat", now, "exp", now + ttlSeconds)));
+            claims = B64URL.encodeToString(MAPPER.writeValueAsBytes(claimMap));
         } catch (Exception e) {
             throw new Invalid("The user doken could not be minted");
         }
@@ -118,7 +122,7 @@ public final class MiniDoken {
         String uid = str(claims, "sub");
         String cnf = str(claims, "cnf");
         if (uid == null || uid.isBlank() || cnf == null || cnf.isBlank()) throw new Invalid("The user doken is incomplete");
-        return new Parsed(uid, cnf, str(claims, "role"));
+        return new Parsed(uid, cnf, str(claims, "role"), str(claims, "sid"));
     }
 
     /**
