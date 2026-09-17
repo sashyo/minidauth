@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sealed chat messages for Rocket.Chat · minidauth</title>
+<meta name="description" content="A Rocket.Chat fork where the text of every message is sealed before it reaches MongoDB, and opens only for a member holding a quorum-granted role, over history and in real time.">
+<link rel="canonical" href="https://www.dauth.me/projects/rocketchat/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Sealed chat messages for Rocket.Chat · minidauth">
+<meta property="og:description" content="A Rocket.Chat fork where the text of every message is sealed before it reaches MongoDB, and opens only for a member holding a quorum-granted role, over history and in real time.">
+<meta property="og:url" content="https://www.dauth.me/projects/rocketchat/">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css?v=20260917">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Sealed chat messages for Rocket.Chat",
+      "description": "A Rocket.Chat fork where the text of every message is sealed before it reaches MongoDB, and opens only for a member holding a quorum-granted role, over history and in real time.",
+      "url": "https://www.dauth.me/projects/rocketchat/",
+      "about": [
+        { "@type": "SoftwareApplication", "name": "minidauth" },
+        { "@type": "SoftwareSourceCode", "name": "Rocket.Chat", "codeRepository": "https://github.com/sashyo/Rocket.Chat" }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "minidauth", "item": "https://www.dauth.me/" },
+        { "@type": "ListItem", "position": 2, "name": "Projects", "item": "https://www.dauth.me/projects/" },
+        { "@type": "ListItem", "position": 3, "name": "Rocket.Chat", "item": "https://www.dauth.me/projects/rocketchat/" }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/">Integrations</a>
+    <a class="pill" href="../../projects/" aria-current="page">Projects</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Projects</a> / Rocket.Chat</p>
+      <h1>Rocket.Chat + minidauth <span>a chat server whose messages the database can't read</span></h1>
+      <p class="lede">A chat server's most sensitive data is the message itself. In this fork of Rocket.Chat, the open source Slack alternative, a message's text is sealed before it reaches MongoDB, and opens back to plaintext only for a member a quorum granted the reading role, both when loading history and as messages arrive live.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/Rocket.Chat/tree/develop">Open the fork</a>
+        <a class="btn" href="https://github.com/RocketChat/Rocket.Chat">Upstream Rocket.Chat</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="sealed">
+      <h2>What gets sealed</h2>
+      <p>Rocket.Chat is the open source team chat platform. The message body is stored as ciphertext, and nothing on the server can decrypt it. The keys the app routes on stay in the clear, so the chat keeps working.</p>
+      <dl class="rows">
+        <div class="row">
+          <dt>Messages</dt>
+          <dd>The body of every message. The room id, the sender and the timestamp stay in the clear, because a chat server sorts and routes on them.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="wiring">
+      <h2>How it's wired</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Sealed at the model layer</h3>
+            <p>One hook on Rocket.Chat's MongoDB base repository seals the message body on insert and update, so every write goes through the same place, and ciphertext is what reaches MongoDB.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Opened per reader, in history and live</h3>
+            <p>Loading a room opens the body as the requesting member through the common message normaliser. A message that arrives live opens per recipient, by reusing Rocket.Chat's own per-subscription transform in the streamer.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Gated by a quorum role</h3>
+            <p>A message opens only if minidauth's quorum grant says that member holds the reading role. A member without it sees ciphertext in the very same room, and revoking it makes reads go dark.</p>
+          </div>
+        </li>
+      </ol>
+      <p style="margin-top:24px">
+        The key that seals these messages exists only as shares across the Tide network, and a quorum of
+        nodes has to cooperate to use it. It is never on the Rocket.Chat server, so a stolen database or a
+        leaked backup reveals only ciphertext.
+      </p>
+    </section>
+
+    <section id="hardening">
+      <h2>Details that matter</h2>
+      <ul class="prose">
+        <li>The sidecar holds no reading identity of its own. Opening is delegated per member and gated on a quorum-granted role.</li>
+        <li>With no reader in context, a message stays sealed, so there&#x27;s never an open decryption service to abuse.</li>
+        <li>Rocket.Chat pre-parses each message into a rendered copy; that copy is dropped on write, so plaintext can&#x27;t leak through it.</li>
+      </ul>
+    </section>
+
+    <section id="status">
+      <h2>Status and running it</h2>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Rocket.Chat. The fork's <a href="https://github.com/sashyo/Rocket.Chat/tree/develop">README</a> covers setup against a running minidauth.</p>
+      <p>
+        Want to do the same for another app, or stuck running this one?
+        <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
+      </p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../../integrations/">Integrations</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../projects/">Projects</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>
