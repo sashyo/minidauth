@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keep roles out of your auth provider's token</title>
+<meta name="description" content="Supabase, Clerk, Auth0 and Cognito all let you put roles in the token they issue. Why the minidauth examples keep only identity there, where the link lives for each provider, and when it's worth it.">
+<link rel="canonical" href="https://www.dauth.me/blog/keep-roles-out-of-the-token">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Keep roles out of your auth provider's token">
+<meta property="og:description" content="Why the minidauth examples put only identity in Supabase, Clerk, Auth0 and Cognito tokens, and read roles from a quorum-approved record instead.">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+<meta property="article:published_time" content="2026-09-17">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Keep roles out of your auth provider's token",
+  "description": "Supabase, Clerk, Auth0 and Cognito all let you put roles in the token they issue. Why the minidauth examples keep only identity there, where the link lives for each provider, and when it's worth it.",
+  "datePublished": "2026-09-17",
+  "dateModified": "2026-09-17",
+  "url": "https://www.dauth.me/blog/keep-roles-out-of-the-token",
+  "mainEntityOfPage": "https://www.dauth.me/blog/keep-roles-out-of-the-token",
+  "image": "https://www.dauth.me/assets/og.png",
+  "author": {
+    "@type": "Organization",
+    "name": "minidauth",
+    "url": "https://www.dauth.me/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "minidauth",
+    "url": "https://www.dauth.me/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../integrations/">Integrations</a>
+      <a class="pill" href="../projects/">Projects</a>
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <article class="post">
+      <p class="label">Integrations</p>
+      <h1>Keep roles out of your auth provider's token</h1>
+      <div class="byline">
+        <time datetime="2026-09-17">17 September 2026</time><span>·</span><span>6 min</span>
+      </div>
+
+      <p class="lede">
+        Every major auth provider gives you a way to put your own data into the token it issues.
+        Supabase copies <code>app_metadata</code> into the access token, Clerk can add metadata to its
+        session token, an Auth0 Action can add claims, and Cognito has its Pre Token Generation
+        trigger. They're useful features, and putting a user's roles there is one of the most common
+        ways apps use them. When we wired minidauth into each of these, every example ended up doing
+        the opposite on purpose, and the reason is worth spelling out.
+      </p>
+
+      <h2>Who can grant the role</h2>
+      <p>
+        A token is signed by the provider on behalf of your project. Anything your project can put
+        into that token, it can also put into anyone's token. That's exactly right when your project is
+        meant to be the authority on who holds which role, which is the case for most apps. It stops
+        being right when the goal is that no single party, including your app and the people who run
+        it, can grant access alone. A role in a token your project can mint is a role your project can
+        grant itself.
+      </p>
+      <p>
+        So in every example the token carries identity and nothing more. Roles come from somewhere the
+        app can read but can't write: a grant record that only changes once several admins have
+        approved the change and the Tide network has signed it.
+      </p>
+
+      <h2>What goes in the token instead</h2>
+      <p>
+        Enough to say who the user is, plus a link to their Tide identity, called a vuid, kept in a
+        field the user can't edit:
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Provider</th><th>Where the link lives</th></tr></thead>
+          <tbody>
+            <tr><td><a href="../integrations/supabase/">Supabase</a></td><td><code>app_metadata.tide_vuid</code>, written with the service role key</td></tr>
+            <tr><td><a href="../integrations/clerk/">Clerk</a></td><td><code>privateMetadata.tideVuid</code></td></tr>
+            <tr><td><a href="../integrations/auth0/">Auth0</a></td><td><code>app_metadata.tide_vuid</code></td></tr>
+            <tr><td><a href="../integrations/cognito/">Cognito</a></td><td><code>custom:tide_vuid</code></td></tr>
+            <tr><td><a href="../integrations/better-auth/">Better Auth</a></td><td>a <code>tideVuid</code> column with <code>input: false</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The rule for picking the field is the same everywhere: the user must not be able to change it.
+        Supabase's <code>user_metadata</code> and Clerk's public metadata can be written from the
+        client, so they're the wrong place for it. On Cognito, if a Pre Token Generation trigger copies
+        anything into the token, it should copy the vuid and nothing else.
+      </p>
+
+      <h2>Reading roles on every request</h2>
+      <p>
+        The protected route in each example asks minidauth what the user holds, every time, instead of
+        trusting a claim in the token:
+      </p>
+      <div class="code"><pre><span class="c">// the vuid comes from the field in the table above</span>
+const roles = await minidauth.rolesFor(user.tideVuid);
+if (!roles.includes("vault-reader")) return res.status(403).end();</pre></div>
+      <p>
+        One side effect is useful on its own: a revoked role takes effect on the next request rather
+        than whenever the token happens to expire. And nothing an admin changes in the provider's
+        dashboard alters the answer, because the provider isn't where the answer lives.
+      </p>
+
+      <h2>Provider details that caught us out</h2>
+      <h3>Supabase</h3>
+      <p>
+        Because <code>app_metadata</code> is copied into the access token, a token issued before the
+        user linked their Tide identity doesn't contain the vuid. The example asks the user to sign in
+        again rather than pretending the token refreshed.
+      </p>
+      <h3>Clerk</h3>
+      <p>
+        The Tide sign-in returns to your app with a cross-site navigation, and on a Clerk development
+        instance <code>authenticateRequest</code> can't identify the caller on that request. The
+        example sets its own short-lived <code>httpOnly</code>, <code>SameSite=Lax</code> cookie when
+        linking starts and reads it on the way back, which is worth doing in production as well.
+      </p>
+      <h3>Auth0</h3>
+      <p>
+        Writing <code>app_metadata</code> needs the application authorised for the Management API with
+        <code>update:users</code>. In the API Access tab that's under Client Access (machine to
+        machine), not User-delegated Access, and it's the easiest step to miss.
+      </p>
+      <h3>Cognito</h3>
+      <p>
+        The example's setup script creates the user pool with a <code>tide_vuid</code> attribute, the
+        app client and the hosted UI domain, and <code>npm run teardown</code> removes them again, so
+        trying it doesn't leave anything behind in your AWS account.
+      </p>
+
+      <h2>When it's worth the extra call</h2>
+      <p>
+        If your app is the right authority for roles, keep them in the token. It's simpler and it saves
+        a request. This pattern earns its keep when the data behind a role is sensitive enough that
+        access should depend on more than one party, which is the reason minidauth exists in the first
+        place.
+      </p>
+      <p>
+        Each provider has a page with the full setup:
+        <a href="../integrations/supabase/">Supabase</a>, <a href="../integrations/clerk/">Clerk</a>,
+        <a href="../integrations/auth0/">Auth0</a>, <a href="../integrations/cognito/">Cognito</a> and
+        <a href="../integrations/better-auth/">Better Auth</a>. If yours isn't there,
+        <a href="https://discord.gg/XBMd9ny2q5">ask in the Discord</a>.
+      </p>
+
+      <p style="margin-top:34px">
+        <a class="btn btn--primary" href="../#start">Try it in two commands</a>
+        <a class="btn" href="./">More posts</a>
+      </p>
+    </article>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="../integrations/">Integrations</a>
+        <a href="../projects/">Projects</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

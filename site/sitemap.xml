@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.dauth.me/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/clerk/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/auth0/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/supabase/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/cognito/</loc></url>
-  <url><loc>https://www.dauth.me/integrations/better-auth/</loc></url>
-  <url><loc>https://www.dauth.me/projects/</loc></url>
-  <url><loc>https://www.dauth.me/projects/formbricks/</loc></url>
-  <url><loc>https://www.dauth.me/projects/twenty/</loc></url>
-  <url><loc>https://www.dauth.me/projects/cal/</loc></url>
-  <url><loc>https://www.dauth.me/blog/</loc></url>
-  <url><loc>https://www.dauth.me/blog/no-central-authority</loc></url>
-  <url><loc>https://www.dauth.me/blog/the-first-policy-is-the-only-one</loc></url>
-  <url><loc>https://www.dauth.me/blog/what-a-stolen-database-looks-like</loc></url>
+  <url><loc>https://www.dauth.me/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/clerk/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/auth0/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/supabase/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/cognito/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/integrations/better-auth/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/projects/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/projects/formbricks/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/projects/twenty/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/projects/cal/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/keep-roles-out-of-the-token</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/prisma-field-level-encryption</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/no-central-authority</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/the-first-policy-is-the-only-one</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://www.dauth.me/blog/what-a-stolen-database-looks-like</loc><lastmod>2026-09-17</lastmod></url>
 </urlset>

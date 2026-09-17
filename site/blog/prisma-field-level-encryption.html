@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field-level encryption in Postgres with a Prisma client extension</title>
+<meta name="description" content="How Cal.com's scheduling platform got field-level encryption from one Prisma client extension: choosing what not to seal, failing closed on writes, refusing forged ciphertext, and batching reads.">
+<link rel="canonical" href="https://www.dauth.me/blog/prisma-field-level-encryption">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Field-level encryption in Postgres with a Prisma client extension">
+<meta property="og:description" content="Choosing what not to seal, failing closed on writes, refusing forged ciphertext, and batching reads, from a real Cal.com fork.">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+<meta property="article:published_time" content="2026-09-17">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Field-level encryption in Postgres with a Prisma client extension",
+  "description": "How Cal.com's scheduling platform got field-level encryption from one Prisma client extension: choosing what not to seal, failing closed on writes, refusing forged ciphertext, and batching reads.",
+  "datePublished": "2026-09-17",
+  "dateModified": "2026-09-17",
+  "url": "https://www.dauth.me/blog/prisma-field-level-encryption",
+  "mainEntityOfPage": "https://www.dauth.me/blog/prisma-field-level-encryption",
+  "image": "https://www.dauth.me/assets/og.png",
+  "author": {
+    "@type": "Organization",
+    "name": "minidauth",
+    "url": "https://www.dauth.me/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "minidauth",
+    "url": "https://www.dauth.me/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../" aria-label="minidauth, home"><img src="../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../">Overview</a>
+    <a class="pill" href="../#how">How it works</a>
+    <a class="pill" href="../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../integrations/">Integrations</a>
+      <a class="pill" href="../projects/">Projects</a>
+      <a class="pill" href="./" aria-current="page">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <article class="post">
+      <p class="label">Engineering</p>
+      <h1>Field-level encryption in Postgres with a Prisma client extension</h1>
+      <div class="byline">
+        <time datetime="2026-09-17">17 September 2026</time><span>·</span><span>7 min</span>
+      </div>
+
+      <p class="lede">
+        Adding minidauth to Cal.com's scheduling platform came down to one Prisma client extension,
+        switched off unless an environment variable is set. The encryption call itself was the easy
+        part. The decisions that took thought were which fields to seal, what should happen when the
+        encryption service is down, and how to stop a value that only looks encrypted from being
+        trusted. They apply to any Postgres app on Prisma, whatever does the encrypting.
+      </p>
+
+      <h2>Why an extension rather than the call sites</h2>
+      <p>
+        A Prisma client extension wraps every query on the shared client, so create, update, upsert,
+        createMany and the find family all pass through one place. Cal.com writes bookings from a lot
+        of routes, and patching each of them would more or less guarantee that some path eventually
+        writes plaintext. With the extension, a route added next year gets sealing without anyone
+        having to remember it. The <a href="../projects/formbricks/">Formbricks fork</a> uses the same
+        shape for survey answers.
+      </p>
+
+      <h2>Decide what not to seal</h2>
+      <p>
+        A sealed column holds ciphertext, so Postgres can no longer sort, filter or search on it. That
+        makes the field list a design decision rather than "everything personal". The Cal.com fork
+        seals these:
+      </p>
+      <div class="code"><pre>const SEALED: Record&lt;string, string[]&gt; = {
+  attendee: ["name", "phoneNumber"],
+  booking: ["title", "description"],
+};</pre></div>
+      <p>
+        Two personal fields are left in the clear on purpose. An attendee's email is an indexed lookup
+        key, used for de-duplication and seats, so sealing it would break those queries. A booking's
+        location is branched on by value, since it can be an integration name, a URL or a street
+        address, so sealing it would break routing rather than just hide it. The rule that fell out of
+        this: seal the personal fields your database never needs to look inside.
+      </p>
+
+      <h2>Nested writes and included reads</h2>
+      <p>
+        A booking is usually created together with its attendees and read back with them included. An
+        extension that only looked at the top-level model would send the attendees' names to Postgres
+        in plaintext. The fork keeps a small map of relations to follow, so a nested create and an
+        include both reach the child's sealed fields:
+      </p>
+      <div class="code"><pre>const RELATIONS: Record&lt;string, Record&lt;string, string&gt;&gt; = {
+  booking: { attendees: "attendee" },
+  attendee: { booking: "booking" },
+};</pre></div>
+      <p>
+        On the write side it follows <code>create</code>, <code>createMany.data</code> and
+        <code>connectOrCreate.create</code>, which covers every way Cal.com creates attendees.
+      </p>
+
+      <h2>Writes fail closed, reads fail sealed</h2>
+      <p>
+        The two directions fail in opposite ways, deliberately. If the sealing service can't be reached
+        during a write, the write throws. Storing plaintext because a dependency was down would quietly
+        undo the whole point of the change, and nobody would notice until much later.
+      </p>
+      <p>
+        On a read, the safer choice is the reverse. If there's no reader identity on the request, the
+        reader doesn't hold the role, or the service is down, the field comes back still sealed and the
+        page renders anyway. Ciphertext on a screen is a visible and harmless failure, where a booking
+        page that crashes is neither.
+      </p>
+
+      <h2>Don't trust a value that looks encrypted</h2>
+      <p>
+        Sealed values are stored as <code>ms1:</code> followed by the ciphertext. The obvious
+        optimisation is to skip anything that already starts with that prefix so it doesn't get sealed
+        twice. The fork doesn't do that, because a client can type the prefix as easily as anything
+        else. If the extension trusted it, someone could submit plaintext beginning with
+        <code>ms1:</code> and have it land as-is in a column everyone believes is sealed.
+      </p>
+      <p>
+        Only the network can tell a real seal from a forged one, since real ones carry a signature from
+        the vendor key. So every non-empty string headed for a sealed column is sent for sealing, and
+        the service decides what comes back. In normal use this doesn't double-seal anything, because
+        the app only ever handles opened values.
+      </p>
+
+      <h2>One round trip, not one per field</h2>
+      <p>
+        A page of bookings with their attendees can hold dozens of sealed values. The extension
+        collects every sealed field in a result, including the included relations, and opens them in
+        one batch: a single fan-out to the network instead of one per field. The fork's notes point at
+        the next step for production, which is to protect one data key per record with the network and
+        encrypt that record's fields locally under it, so the cost is one network operation per record
+        however many fields it has.
+      </p>
+
+      <h2>Who is reading</h2>
+      <p>
+        There's no service account that can open everything. The session middleware attaches the
+        signed-in user to each authenticated request, and the sealing service decrypts as that user,
+        and only if the quorum's grant says they hold the reading role. A request with no reader gets
+        ciphertext. That takes away the most useful thing an attacker could hope to find on the
+        server, which is a credential that decrypts whatever it's asked to.
+      </p>
+
+      <h2>What you give up</h2>
+      <p>
+        Search and sort on the sealed columns, a network call on reads that open fields, and some care
+        about which fields are really lookup keys. In return, a copy of the database or a backup holds
+        ciphertext for the fields that matter, and whether anyone can read them depends on a role your
+        admins approved rather than on the app.
+      </p>
+      <p>
+        The <a href="../projects/cal/">Cal.diy project page</a> summarises what the fork seals, and the
+        <a href="https://github.com/sashyo/cal.diy">fork itself</a> has the full change. If you're doing
+        this to your own Prisma app and get stuck, <a href="https://discord.gg/XBMd9ny2q5">ask in the
+        Discord</a>.
+      </p>
+
+      <p style="margin-top:34px">
+        <a class="btn btn--primary" href="../#start">Try it in two commands</a>
+        <a class="btn" href="./">More posts</a>
+      </p>
+    </article>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../">Overview</a>
+        <a href="../integrations/">Integrations</a>
+        <a href="../projects/">Projects</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

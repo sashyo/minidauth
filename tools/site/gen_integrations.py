@@ -186,6 +186,8 @@ def page(title, desc, canonical, r, current, ld, body):
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{BASE}/assets/og.png">
 <link rel="icon" href="{r}assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="{r}favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="{r}assets/apple-touch-icon.png">
 {FONTS}
 <link rel="stylesheet" href="{r}styles.css">
 <script type="application/ld+json">
@@ -576,11 +578,14 @@ for p in P:
 
 pages = ["/", "/integrations/"] + [f"/integrations/{p['slug']}/" for p in P] + \
     ["/projects/"] + [f"/projects/{q['slug']}/" for q in PROJ] + [
-    "/blog/", "/blog/no-central-authority", "/blog/the-first-policy-is-the-only-one",
+    "/blog/", "/blog/keep-roles-out-of-the-token", "/blog/prisma-field-level-encryption",
+    "/blog/no-central-authority", "/blog/the-first-policy-is-the-only-one",
     "/blog/what-a-stolen-database-looks-like"]
 sm = ['<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-sm += [f"  <url><loc>{BASE}{u}</loc></url>" for u in pages]
+import datetime
+today = datetime.date.today().isoformat()
+sm += [f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod></url>" for u in pages]
 sm.append("</urlset>")
 open(f"{SITE}/sitemap.xml", "w").write("\n".join(sm) + "\n")
 open(f"{SITE}/robots.txt", "w").write(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}/sitemap.xml\n")

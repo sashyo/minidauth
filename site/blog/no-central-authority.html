@@ -16,6 +16,8 @@
 <meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -235,7 +237,9 @@
         failure. minidauth lifts the key lifecycle and the governance out of TideCloak and puts them
         behind an ordinary HTTP service, so the login you have stays where it is and the fabric sits
         beside it. In practice that is one column on your user record, one callback route, and asking
-        for roles instead of storing them:
+        for roles instead of storing them (the <a href="../integrations/">integration pages</a> show
+        where each provider keeps that column, and <a href="keep-roles-out-of-the-token">this post</a>
+        explains why the roles stay out of the token):
       </p>
       <div class="code"><pre><span class="c">// before: your database decides</span>
 if (user.role === "admin") return decrypt(record);

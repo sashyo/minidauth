@@ -16,6 +16,8 @@
 <meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -27,6 +29,18 @@
   "name": "minidauth blog",
   "url": "https://www.dauth.me/blog/",
   "blogPost": [
+    {
+      "@type": "BlogPosting",
+      "headline": "Keep roles out of your auth provider's token",
+      "datePublished": "2026-09-17",
+      "url": "https://www.dauth.me/blog/keep-roles-out-of-the-token"
+    },
+    {
+      "@type": "BlogPosting",
+      "headline": "Field-level encryption in Postgres with a Prisma client extension",
+      "datePublished": "2026-09-17",
+      "url": "https://www.dauth.me/blog/prisma-field-level-encryption"
+    },
     {
       "@type": "BlogPosting",
       "headline": "Taking the central authority out of your app",
@@ -83,6 +97,20 @@
       </div>
 
       <div class="posts">
+        <a class="post-link" href="keep-roles-out-of-the-token">
+          <time datetime="2026-09-17">2026.09.17</time>
+          <div>
+            <h3>Keep roles out of your auth provider's token</h3>
+            <p>Supabase, Clerk, Auth0 and Cognito all let you put roles in the token. Why every minidauth example keeps only identity there.</p>
+          </div>
+        </a>
+        <a class="post-link" href="prisma-field-level-encryption">
+          <time datetime="2026-09-17">2026.09.17</time>
+          <div>
+            <h3>Field-level encryption in Postgres with a Prisma client extension</h3>
+            <p>What sealing Cal.com's booking data taught us: what not to seal, failing closed, forged ciphertext, and batching.</p>
+          </div>
+        </a>
         <a class="post-link" href="no-central-authority.html">
           <time datetime="2026-09-16">2026.09.16</time>
           <div>

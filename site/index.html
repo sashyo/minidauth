@@ -18,6 +18,8 @@
 <meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
 <meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
 <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
@@ -227,28 +229,29 @@ const roles = await minidauth.rolesFor(user.vuid);</pre>
     <section id="writing">
       <h2>Blog</h2>
       <div class="posts">
-        <a class="post-link" href="blog/no-central-authority.html">
+        <a class="post-link" href="blog/keep-roles-out-of-the-token">
+          <time datetime="2026-09-17">2026.09.17</time>
+          <div>
+            <h3>Keep roles out of your auth provider's token</h3>
+            <p>Supabase, Clerk, Auth0 and Cognito all let you put roles in the token. Why every minidauth example keeps only identity there.</p>
+          </div>
+        </a>
+        <a class="post-link" href="blog/prisma-field-level-encryption">
+          <time datetime="2026-09-17">2026.09.17</time>
+          <div>
+            <h3>Field-level encryption in Postgres with a Prisma client extension</h3>
+            <p>What sealing Cal.com's booking data taught us: what not to seal, failing closed, forged ciphertext, and batching.</p>
+          </div>
+        </a>
+        <a class="post-link" href="blog/no-central-authority">
           <time datetime="2026-09-16">2026.09.16</time>
           <div>
             <h3>Taking the central authority out of your app</h3>
             <p>What moves off your server when a threshold of nodes holds the key, and what that changes about asking people to trust you.</p>
           </div>
         </a>
-        <a class="post-link" href="blog/the-first-policy-is-the-only-one.html">
-          <time datetime="2026-09-15">2026.09.15</time>
-          <div>
-            <h3>The first policy is the only one that pack will ever sign</h3>
-            <p>Two paid vendor keys went in the bin teaching us this.</p>
-          </div>
-        </a>
-        <a class="post-link" href="blog/what-a-stolen-database-looks-like.html">
-          <time datetime="2026-09-08">2026.09.08</time>
-          <div>
-            <h3>What a stolen database looks like</h3>
-            <p>Write a row, print the table, read the ciphertext. Then ask the network to sign something it should refuse.</p>
-          </div>
-        </a>
       </div>
+      <p style="margin-top:20px"><a href="blog/">All posts</a></p>
     </section>
 
     <section id="start">
