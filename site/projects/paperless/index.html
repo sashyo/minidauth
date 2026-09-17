@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sealed accounts and transactions for Firefly III · minidauth</title>
-<meta name="description" content="A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.">
-<link rel="canonical" href="https://www.dauth.me/projects/firefly/">
+<title>Sealed documents and OCR text for Paperless-ngx · minidauth</title>
+<meta name="description" content="A Paperless-ngx fork where a document&#x27;s title, its OCR text, the correspondent and its notes are sealed before they reach the database and the search index, and open only for a user holding a quorum-granted role.">
+<link rel="canonical" href="https://www.dauth.me/projects/paperless/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Sealed accounts and transactions for Firefly III · minidauth">
-<meta property="og:description" content="A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.">
-<meta property="og:url" content="https://www.dauth.me/projects/firefly/">
+<meta property="og:title" content="Sealed documents and OCR text for Paperless-ngx · minidauth">
+<meta property="og:description" content="A Paperless-ngx fork where a document&#x27;s title, its OCR text, the correspondent and its notes are sealed before they reach the database and the search index, and open only for a user holding a quorum-granted role.">
+<meta property="og:url" content="https://www.dauth.me/projects/paperless/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -30,9 +30,9 @@
   "@graph": [
     {
       "@type": "TechArticle",
-      "headline": "Sealed accounts and transactions for Firefly III",
-      "description": "A Firefly III fork where payee names, IBANs, transaction descriptions and notes are sealed before they reach the database, and open only for a user holding a quorum-granted role, while balances stay in the clear so reports still work.",
-      "url": "https://www.dauth.me/projects/firefly/",
+      "headline": "Sealed documents and OCR text for Paperless-ngx",
+      "description": "A Paperless-ngx fork where a document's title, its OCR text, the correspondent and its notes are sealed before they reach the database and the search index, and open only for a user holding a quorum-granted role.",
+      "url": "https://www.dauth.me/projects/paperless/",
       "about": [
         {
           "@type": "SoftwareApplication",
@@ -40,8 +40,8 @@
         },
         {
           "@type": "SoftwareSourceCode",
-          "name": "Firefly III",
-          "codeRepository": "https://github.com/sashyo/firefly-iii"
+          "name": "Paperless-ngx",
+          "codeRepository": "https://github.com/sashyo/paperless-ngx"
         }
       ]
     },
@@ -63,8 +63,8 @@
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Firefly III",
-          "item": "https://www.dauth.me/projects/firefly/"
+          "name": "Paperless-ngx",
+          "item": "https://www.dauth.me/projects/paperless/"
         }
       ]
     }
@@ -91,31 +91,31 @@
   <main>
 
     <header class="hero">
-      <p class="label"><a href="../">Projects</a> / Firefly III</p>
-      <h1>Firefly III + minidauth <span>a budget file that reveals nothing if it is stolen</span></h1>
-      <p class="lede">A personal finance manager knows who you pay, how to reach them and what every transaction was for. In this fork of Firefly III, those fields are sealed before they reach the database, and open only for a user a quorum granted the reading role. The numbers a budgeting app has to add up stay in the clear, so reports and charts are untouched. It is a second non-Node integration, in PHP and Laravel, further proving the sealing sidecar is language-agnostic.</p>
+      <p class="label"><a href="../">Projects</a> / Paperless-ngx</p>
+      <h1>Paperless-ngx + minidauth <span>a document archive that reveals nothing if it is stolen</span></h1>
+      <p class="lede">A document archive is a pile of exactly the things a breach is about: who wrote to you, what the letter said, the notes you took. In this fork of Paperless-ngx, a document's title, its full OCR text, the correspondent and the notes are sealed before they reach the database, and open only for a user a quorum granted the reading role. It is a first integration in Python and Django, further proving the sealing sidecar is language-agnostic.</p>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="https://github.com/sashyo/firefly-iii">Open the fork</a>
-        <a class="btn" href="https://github.com/firefly-iii/firefly-iii">Upstream Firefly III</a>
+        <a class="btn btn--primary" href="https://github.com/sashyo/paperless-ngx">Open the fork</a>
+        <a class="btn" href="https://github.com/paperless-ngx/paperless-ngx">Upstream Paperless-ngx</a>
       </div>
       <p class="micro"><span class="chip chip--live">Run end to end</span></p>
     </header>
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Firefly III is the open source personal finance manager. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <p>Paperless-ngx is the open source document archive. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
-          <dt>Accounts</dt>
-          <dd>Payee and account names, and IBANs. The numeric balance stays in the clear so totals still add up.</dd>
+          <dt>Documents</dt>
+          <dd>Title and the full OCR text. The content length a statistics view needs stays a plain number.</dd>
         </div>
         <div class="row">
-          <dt>Transactions</dt>
-          <dd>The description of each transaction journal.</dd>
+          <dt>Correspondents</dt>
+          <dd>The name of who a document is from.</dd>
         </div>
         <div class="row">
           <dt>Notes</dt>
-          <dd>The free-text note attached to an account or a transaction.</dd>
+          <dd>The free-text notes attached to a document.</dd>
         </div>
       </dl>
     </section>
@@ -126,25 +126,25 @@
         <li>
           <div>
             <h3>Sealed on write</h3>
-            <p>An Eloquent trait seals the declared fields in the model&#x27;s saving() event, so every write of an account, transaction or note goes through one place, and ciphertext is what reaches the database.</p>
+            <p>A pre_save receiver seals the chosen fields on every create and update, so ciphertext is what reaches the database and, through it, the full-text index.</p>
           </div>
         </li>
         <li>
           <div>
-            <h3>Opened per user</h3>
-            <p>The same trait&#x27;s retrieved() event opens the fields as the signed-in user Laravel already tracks, then resyncs the attribute so an opened value is never written back as plaintext.</p>
+            <h3>Opened per user, only in the response</h3>
+            <p>The DRF serializers open the sealed fields for the request&#x27;s authenticated user. Opening never happens at the model or index layer, so plaintext exists only in the API response and never touches the search index on disk.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>A field opens only if minidauth&#x27;s quorum grant says that user holds the reading role. Revoke it and the user sees their own account name as ciphertext, with no change to Firefly III or its login.</p>
+            <p>A field opens only if minidauth&#x27;s quorum grant says that user holds the reading role. Even a Paperless admin who can open the document sees ciphertext without it, and revoking it makes the same view go dark.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
         The key that seals these fields exists only as shares across the Tide network, and 14 of 20
-        nodes have to cooperate to use it. It is never on the Firefly III server.
+        nodes have to cooperate to use it. It is never on the Paperless-ngx server.
       </p>
     </section>
 
@@ -152,20 +152,20 @@
       <h2>Details that matter</h2>
       <ul class="prose">
         <li>The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.</li>
-        <li>With no reader in the request, a field simply stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.</li>
-        <li>The PHP side signs its short-lived reader token with a private Ed25519 key rather than a shared secret, so a copy of a config file is worthless.</li>
-        <li>Numeric amounts and balances are never sealed, so budgets, reports and charts keep working exactly as upstream.</li>
+        <li>With no granted reader in the request, a field stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.</li>
+        <li>The full-text search index holds only ciphertext, because sealing is written before the index is built and opening happens only on the way out.</li>
+        <li>The reader token is a short-lived Ed25519 assertion signed with a private key, so a copy of a config file is worthless.</li>
       </ul>
     </section>
 
     <section id="status">
       <h2>Status and running it</h2>
-      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Firefly III. The fork's <a href="https://github.com/sashyo/firefly-iii/tree/minidauth-sealing">README</a> covers setup against a running minidauth.</p>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Paperless-ngx. The fork's <a href="https://github.com/sashyo/paperless-ngx/tree/minidauth-sealing">README</a> covers setup against a running minidauth.</p>
       <p>
         Want to do the same for another app, or stuck running this one?
         <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
       </p>
-      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../paperless/">Paperless-ngx</a> · <a href="../../integrations/">Integrations</a></p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../firefly/">Firefly III</a> · <a href="../../integrations/">Integrations</a></p>
     </section>
 
     <footer>

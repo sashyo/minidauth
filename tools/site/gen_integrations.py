@@ -540,6 +540,26 @@ PROJ = [
                    "Numeric amounts and balances are never sealed, so budgets, reports and charts keep working exactly as upstream."],
         status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Firefly III.",
     ),
+    dict(
+        slug="paperless", name="Paperless-ngx", kind="the open source document archive",
+        upstream="paperless-ngx/paperless-ngx", fork="sashyo/paperless-ngx",
+        run_url="https://github.com/sashyo/paperless-ngx/tree/minidauth-sealing",
+        title="Sealed documents and OCR text for Paperless-ngx · minidauth",
+        desc="A Paperless-ngx fork where a document's title, its OCR text, the correspondent and its notes are sealed before they reach the database and the search index, and open only for a user holding a quorum-granted role.",
+        tagline="a document archive that reveals nothing if it is stolen",
+        lede="A document archive is a pile of exactly the things a breach is about: who wrote to you, what the letter said, the notes you took. In this fork of Paperless-ngx, a document's title, its full OCR text, the correspondent and the notes are sealed before they reach the database, and open only for a user a quorum granted the reading role. It is a first integration in Python and Django, further proving the sealing sidecar is language-agnostic.",
+        sealed=[("Documents", "Title and the full OCR text. The content length a statistics view needs stays a plain number."),
+                ("Correspondents", "The name of who a document is from."),
+                ("Notes", "The free-text notes attached to a document.")],
+        wiring=[("Sealed on write", "A pre_save receiver seals the chosen fields on every create and update, so ciphertext is what reaches the database and, through it, the full-text index."),
+                ("Opened per user, only in the response", "The DRF serializers open the sealed fields for the request's authenticated user. Opening never happens at the model or index layer, so plaintext exists only in the API response and never touches the search index on disk."),
+                ("Gated by a quorum role", "A field opens only if minidauth's quorum grant says that user holds the reading role. Even a Paperless admin who can open the document sees ciphertext without it, and revoking it makes the same view go dark.")],
+        hardening=["The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.",
+                   "With no granted reader in the request, a field stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.",
+                   "The full-text search index holds only ciphertext, because sealing is written before the index is built and opening happens only on the way out.",
+                   "The reader token is a short-lived Ed25519 assertion signed with a private key, so a copy of a config file is worthless."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Paperless-ngx.",
+    ),
 ]
 
 
