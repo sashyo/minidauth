@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../styles.css?v=20260917">
 <meta property="article:published_time" content="2026-09-17">
 <script type="application/ld+json">
 {
@@ -73,33 +73,49 @@
       </div>
 
       <p class="lede">
-        Every major auth provider gives you a way to put your own data into the token it issues.
-        Supabase copies <code>app_metadata</code> into the access token, Clerk can add metadata to its
-        session token, an Auth0 Action can add claims, and Cognito has its Pre Token Generation
-        trigger. They're useful features, and putting a user's roles there is one of the most common
-        ways apps use them. When we wired minidauth into each of these, every example ended up doing
-        the opposite on purpose, and the reason is worth spelling out.
+        Every major auth provider lets you put your own data into the token it issues. Supabase copies
+        <code>app_metadata</code> into the access token, Clerk can add metadata to its session token,
+        an Auth0 Action can add claims, and Cognito has its Pre Token Generation trigger. Putting a
+        user's roles there is one of the most common things people use those features for, and for a
+        lot of apps it's the right call. When we wired minidauth into each of these providers, every
+        example ended up keeping roles out of the token on purpose, and it's worth explaining why.
       </p>
 
-      <h2>Who can grant the role</h2>
+      <h2>Who gets to decide what the token says</h2>
       <p>
-        A token is signed by the provider on behalf of your project. Anything your project can put
-        into that token, it can also put into anyone's token. That's exactly right when your project is
-        meant to be the authority on who holds which role, which is the case for most apps. It stops
-        being right when the goal is that no single party, including your app and the people who run
-        it, can grant access alone. A role in a token your project can mint is a role your project can
-        grant itself.
+        The provider signs the token on behalf of your project, which means whatever your project can
+        write into it, your project can write into anyone's. If your app is supposed to be the
+        authority on who holds which role, that's fine. It isn't fine when the whole point is that no
+        single party should be able to hand out access by itself, and that includes your own app and
+        anyone with a login to its dashboard.
       </p>
       <p>
-        So in every example the token carries identity and nothing more. Roles come from somewhere the
-        app can read but can't write: a grant record that only changes once several admins have
-        approved the change and the Tide network has signed it.
+        So in every example the token only says who the user is. Roles come from a grant record the
+        app can read but can't change, which only updates once several admins have approved the
+        change and the Tide network has signed it. The easiest way to see the difference is to try a
+        few things that happen in real life:
       </p>
+
+      <div class="demo" data-demo="roles">
+        <p class="cap">Where the role comes from</p>
+        <p class="seg-label">The app reads roles from</p>
+        <div class="seg" role="group" aria-label="Where roles are read from">
+          <button type="button" id="roles-token" data-source="token" aria-pressed="true">The provider's token</button>
+          <button type="button" id="roles-grant" data-source="grant" aria-pressed="false">minidauth's grant record</button>
+        </div>
+        <p class="seg-label">What happens</p>
+        <div class="seg" role="group" aria-label="Choose what happens">
+          <button type="button" id="roles-edit" data-scenario="edit" aria-pressed="true">Someone adds vault-reader in the provider dashboard</button>
+          <button type="button" id="roles-revoke" data-scenario="revoke" aria-pressed="false">The user's role is revoked</button>
+          <button type="button" id="roles-quorum" data-scenario="quorum" aria-pressed="false">Three admins approve a grant</button>
+        </div>
+        <p class="out" aria-live="polite"><span class="chip chip--live">Allowed</span><span class="why">Allowed from the user's next sign-in. One person with dashboard access was enough to grant it.</span></p>
+      </div>
 
       <h2>What goes in the token instead</h2>
       <p>
-        Enough to say who the user is, plus a link to their Tide identity, called a vuid, kept in a
-        field the user can't edit:
+        Enough to identify the user, plus a link to their Tide identity (a value called the vuid),
+        kept in a field the user can't edit:
       </p>
       <div class="tw">
         <table>
@@ -114,66 +130,79 @@
         </table>
       </div>
       <p>
-        The rule for picking the field is the same everywhere: the user must not be able to change it.
-        Supabase's <code>user_metadata</code> and Clerk's public metadata can be written from the
-        client, so they're the wrong place for it. On Cognito, if a Pre Token Generation trigger copies
-        anything into the token, it should copy the vuid and nothing else.
+        The one rule for choosing the field is that the user mustn't be able to change it. Supabase's
+        <code>user_metadata</code> and Clerk's public metadata can both be written from the browser,
+        so they're the wrong place. On Cognito, if you do use a Pre Token Generation trigger, have it
+        copy the vuid and nothing else.
       </p>
 
-      <h2>Reading roles on every request</h2>
+      <h2>Asking for roles on every request</h2>
       <p>
-        The protected route in each example asks minidauth what the user holds, every time, instead of
-        trusting a claim in the token:
+        The protected route in each example asks minidauth what the user holds each time, instead of
+        trusting whatever the token says:
       </p>
       <div class="code"><pre><span class="c">// the vuid comes from the field in the table above</span>
 const roles = await minidauth.rolesFor(user.tideVuid);
 if (!roles.includes("vault-reader")) return res.status(403).end();</pre></div>
       <p>
-        One side effect is useful on its own: a revoked role takes effect on the next request rather
-        than whenever the token happens to expire. And nothing an admin changes in the provider's
-        dashboard alters the answer, because the provider isn't where the answer lives.
+        A side effect we ended up liking is that revoking a role works on the next request, instead of
+        whenever the user's token happens to expire. It also means nothing anyone changes in the
+        provider's dashboard affects who can read, since the provider was never asked.
       </p>
 
-      <h2>Provider details that caught us out</h2>
+      <figure class="shot">
+        <img src="../assets/supabase-granted.png" alt="A Supabase user linked to a Tide identity, with granted roles listed" width="900" height="260" loading="lazy">
+        <figcaption>The Supabase example after linking. None of these roles are in the Supabase token; the page read them from the grant record.</figcaption>
+      </figure>
+
+      <h2>Things that caught us out, provider by provider</h2>
       <h3>Supabase</h3>
       <p>
-        Because <code>app_metadata</code> is copied into the access token, a token issued before the
-        user linked their Tide identity doesn't contain the vuid. The example asks the user to sign in
-        again rather than pretending the token refreshed.
+        Because <code>app_metadata</code> is copied into the access token when it's issued, a token
+        from before the user linked their Tide identity doesn't have the vuid in it. Rather than
+        pretend the token refreshed, the example says so and asks the user to sign in again, which
+        only takes a few seconds.
       </p>
       <h3>Clerk</h3>
       <p>
-        The Tide sign-in returns to your app with a cross-site navigation, and on a Clerk development
-        instance <code>authenticateRequest</code> can't identify the caller on that request. The
-        example sets its own short-lived <code>httpOnly</code>, <code>SameSite=Lax</code> cookie when
-        linking starts and reads it on the way back, which is worth doing in production as well.
+        The Tide sign-in comes back to your app through a cross-site navigation, and on a Clerk
+        development instance <code>authenticateRequest</code> can't work out who the caller is on that
+        request. The example gets around it by setting its own short-lived <code>httpOnly</code>,
+        <code>SameSite=Lax</code> cookie when linking starts and reading it on the way back. We'd keep
+        that in production too, since it doesn't depend on the provider at all.
       </p>
       <h3>Auth0</h3>
       <p>
-        Writing <code>app_metadata</code> needs the application authorised for the Management API with
-        <code>update:users</code>. In the API Access tab that's under Client Access (machine to
-        machine), not User-delegated Access, and it's the easiest step to miss.
+        Saving the vuid to <code>app_metadata</code> needs the application authorised for the
+        Management API with the <code>update:users</code> scope, and it lives under Client Access
+        (machine to machine), not User-delegated Access. We missed it ourselves. The screenshot below
+        is from our own recorded run, where the link only lasted for the session because the scope
+        wasn't there yet:
       </p>
+      <figure class="shot">
+        <img src="../assets/auth0-session-only.png" alt="The Auth0 example showing granted roles and a red note that the link is kept for this session only" width="900" height="300" loading="lazy">
+        <figcaption>Our Auth0 run before the Management API scope was added. The red line is the example telling us so.</figcaption>
+      </figure>
       <h3>Cognito</h3>
       <p>
         The example's setup script creates the user pool with a <code>tide_vuid</code> attribute, the
-        app client and the hosted UI domain, and <code>npm run teardown</code> removes them again, so
-        trying it doesn't leave anything behind in your AWS account.
+        app client and the hosted UI domain, and <code>npm run teardown</code> deletes them again, so
+        you can try it without leaving anything behind in your AWS account.
       </p>
 
-      <h2>When it's worth the extra call</h2>
+      <h2>When it's worth the extra request</h2>
       <p>
-        If your app is the right authority for roles, keep them in the token. It's simpler and it saves
-        a request. This pattern earns its keep when the data behind a role is sensitive enough that
-        access should depend on more than one party, which is the reason minidauth exists in the first
-        place.
+        If your app really is the authority on roles, keep them in the token. It's simpler and it
+        saves a round trip. Reading them from a grant record starts paying off when the data behind a
+        role is sensitive enough that you don't want any one person or system to be able to grant
+        access, which is the situation minidauth was built for.
       </p>
       <p>
-        Each provider has a page with the full setup:
+        Each provider has its own page with the full setup:
         <a href="../integrations/supabase/">Supabase</a>, <a href="../integrations/clerk/">Clerk</a>,
         <a href="../integrations/auth0/">Auth0</a>, <a href="../integrations/cognito/">Cognito</a> and
-        <a href="../integrations/better-auth/">Better Auth</a>. If yours isn't there,
-        <a href="https://discord.gg/XBMd9ny2q5">ask in the Discord</a>.
+        <a href="../integrations/better-auth/">Better Auth</a>. If yours isn't on the list,
+        <a href="https://discord.gg/XBMd9ny2q5">ask in the Discord</a> and we'll work it out.
       </p>
 
       <p style="margin-top:34px">
@@ -200,5 +229,6 @@ if (!roles.includes("vault-reader")) return res.status(403).end();</pre></div>
     </footer>
   </main>
 </div>
+<script src="../assets/demos.js"></script>
 </body>
 </html>

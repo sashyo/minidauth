@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../styles.css?v=20260917">
 <meta property="article:published_time" content="2026-09-17">
 <script type="application/ld+json">
 {
@@ -69,120 +69,188 @@
       <p class="label">Engineering</p>
       <h1>Field-level encryption in Postgres with a Prisma client extension</h1>
       <div class="byline">
-        <time datetime="2026-09-17">17 September 2026</time><span>·</span><span>7 min</span>
+        <time datetime="2026-09-17">17 September 2026</time><span>·</span><span>8 min</span>
       </div>
 
       <p class="lede">
-        Adding minidauth to Cal.com's scheduling platform came down to one Prisma client extension,
-        switched off unless an environment variable is set. The encryption call itself was the easy
-        part. The decisions that took thought were which fields to seal, what should happen when the
-        encryption service is down, and how to stop a value that only looks encrypted from being
-        trusted. They apply to any Postgres app on Prisma, whatever does the encrypting.
+        We've now added minidauth to three open source apps, Formbricks, Twenty and Cal.com's
+        scheduling platform, and by the third one the Postgres side had settled into a pattern we'd be
+        happy to reuse. Cal.com's version is a single Prisma client extension that does nothing unless
+        an environment variable is set. Getting there took a couple of mistakes in the first two apps,
+        and those turned out to be the useful part, so they're in here too.
       </p>
 
-      <h2>Why an extension rather than the call sites</h2>
+      <h2>Why we used an extension instead of editing each query</h2>
       <p>
         A Prisma client extension wraps every query on the shared client, so create, update, upsert,
-        createMany and the find family all pass through one place. Cal.com writes bookings from a lot
-        of routes, and patching each of them would more or less guarantee that some path eventually
-        writes plaintext. With the extension, a route added next year gets sealing without anyone
-        having to remember it. The <a href="../projects/formbricks/">Formbricks fork</a> uses the same
-        shape for survey answers.
+        createMany and all the find methods go through one piece of code. Cal.com writes bookings from
+        a lot of different routes. If we'd patched each of them by hand, it would only have been a
+        matter of time before a new route wrote a name to the database in plaintext because nobody
+        remembered to seal it. With the extension in place, sealing happens whether or not the person
+        writing the route knows about it.
       </p>
 
-      <h2>Decide what not to seal</h2>
+      <h2>Picking the fields to seal</h2>
       <p>
-        A sealed column holds ciphertext, so Postgres can no longer sort, filter or search on it. That
-        makes the field list a design decision rather than "everything personal". The Cal.com fork
-        seals these:
+        Once a column holds ciphertext, Postgres can't sort, filter or search on it any more, so the
+        field list ends up being a design decision rather than "everything that looks personal". For
+        Cal.com we sealed an attendee's name and phone number and a booking's title and description,
+        and left two personal fields readable on purpose. The attendee's email is an indexed lookup
+        key that Cal.com uses for de-duplication and seats, and sealing it would have broken those
+        queries. The booking's location is something the code branches on, since it can be an
+        integration name, a URL or a street address, so sealing it would have broken routing rather
+        than just hiding an address.
       </p>
+      <p>Here's what that looks like for one made-up booking, depending on who is looking:</p>
+
+      <div class="demo" data-demo="record">
+        <p class="cap">One booking, three ways of looking at it</p>
+        <div class="seg" role="group" aria-label="Choose who is looking">
+          <button type="button" id="rec-db" data-view="db" aria-pressed="true">Postgres</button>
+          <button type="button" id="rec-reader" data-view="reader" aria-pressed="false">Reader with the role</button>
+          <button type="button" id="rec-none" data-view="none" aria-pressed="false">Reader without it</button>
+        </div>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Field</th><th>Value</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="k">booking.title</td><td class="v sealed" data-plain="Follow-up on test results">ms1:AQAAAEAAAAC…</td><td class="tag">sealed</td></tr>
+              <tr><td class="k">booking.description</td><td class="v sealed" data-plain="Wants to go over the biopsy report before Friday">ms1:AQAAAEAAAAC…</td><td class="tag">sealed</td></tr>
+              <tr><td class="k">booking.location</td><td class="v clear">integrations:zoom</td><td class="tag">clear</td></tr>
+              <tr><td class="k">attendee.name</td><td class="v sealed" data-plain="Dana Whitfield">ms1:AQAAAEAAAAC…</td><td class="tag">sealed</td></tr>
+              <tr><td class="k">attendee.email</td><td class="v clear">dana@example.com</td><td class="tag">clear</td></tr>
+              <tr><td class="k">attendee.phoneNumber</td><td class="v sealed" data-plain="+61 412 555 019">ms1:AQAAAEAAAAC…</td><td class="tag">sealed</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="out">What Postgres holds, and what a stolen backup contains. The sealed fields are ciphertext; email and location stay readable because the app looks them up and branches on them.</p>
+        <p class="fine">An illustration with made-up data. The ciphertext shown isn't real.</p>
+      </div>
+
+      <p>In the extension itself, that decision is a small map:</p>
       <div class="code"><pre>const SEALED: Record&lt;string, string[]&gt; = {
   attendee: ["name", "phoneNumber"],
   booking: ["title", "description"],
 };</pre></div>
-      <p>
-        Two personal fields are left in the clear on purpose. An attendee's email is an indexed lookup
-        key, used for de-duplication and seats, so sealing it would break those queries. A booking's
-        location is branched on by value, since it can be an integration name, a URL or a street
-        address, so sealing it would break routing rather than just hide it. The rule that fell out of
-        this: seal the personal fields your database never needs to look inside.
-      </p>
 
-      <h2>Nested writes and included reads</h2>
+      <h2>Bookings arrive with their attendees attached</h2>
       <p>
-        A booking is usually created together with its attendees and read back with them included. An
-        extension that only looked at the top-level model would send the attendees' names to Postgres
-        in plaintext. The fork keeps a small map of relations to follow, so a nested create and an
-        include both reach the child's sealed fields:
+        Cal.com usually creates a booking and its attendees in one nested write, and reads them back
+        with the attendees included. An extension that only looked at the top-level model would have
+        sealed the booking's title and sent every attendee's name to Postgres untouched. So there's a
+        second map listing which relations to follow, and on the write side the extension walks into
+        <code>create</code>, <code>createMany.data</code> and <code>connectOrCreate.create</code>:
       </p>
       <div class="code"><pre>const RELATIONS: Record&lt;string, Record&lt;string, string&gt;&gt; = {
   booking: { attendees: "attendee" },
   attendee: { booking: "booking" },
 };</pre></div>
+
+      <h2>What happens when the sealing service is down</h2>
       <p>
-        On the write side it follows <code>create</code>, <code>createMany.data</code> and
-        <code>connectOrCreate.create</code>, which covers every way Cal.com creates attendees.
+        We made writes and reads fail in opposite directions. If the sealing service can't be reached
+        while a booking is being saved, the save throws an error. The alternative would be storing the
+        name in plaintext because a dependency had a bad minute, which is exactly the kind of failure
+        nobody notices until an audit.
+      </p>
+      <p>
+        Reads go the other way. If there's no signed-in reader, the reader doesn't hold the role, or
+        the service is unreachable, the booking still loads and the sealed fields just show up as
+        ciphertext. Someone seeing a string of gibberish where a name should be is annoying, but it's
+        a lot better than a booking page that won't open at all.
       </p>
 
-      <h2>Writes fail closed, reads fail sealed</h2>
+      <h2>The shortcut that let plaintext through</h2>
       <p>
-        The two directions fail in opposite ways, deliberately. If the sealing service can't be reached
-        during a write, the write throws. Storing plaintext because a dependency was down would quietly
-        undo the whole point of the change, and nobody would notice until much later.
+        This one we got wrong first, in Formbricks. Sealed values are stored as <code>ms1:</code>
+        followed by the ciphertext, and when a form is saved again without changes, the unchanged
+        answers come back already sealed. Sealing them a second time produced values that could never
+        be opened. So we added a check that let anything shaped like a sealed value pass straight
+        through.
       </p>
       <p>
-        On a read, the safer choice is the reverse. If there's no reader identity on the request, the
-        reader doesn't hold the role, or the service is down, the field comes back still sealed and the
-        page renders anyway. Ciphertext on a screen is a visible and harmless failure, where a booking
-        page that crashes is neither.
-      </p>
-
-      <h2>Don't trust a value that looks encrypted</h2>
-      <p>
-        Sealed values are stored as <code>ms1:</code> followed by the ciphertext. The obvious
-        optimisation is to skip anything that already starts with that prefix so it doesn't get sealed
-        twice. The fork doesn't do that, because a client can type the prefix as easily as anything
-        else. If the extension trusted it, someone could submit plaintext beginning with
-        <code>ms1:</code> and have it land as-is in a column everyone believes is sealed.
-      </p>
-      <p>
-        Only the network can tell a real seal from a forged one, since real ones carry a signature from
-        the vendor key. So every non-empty string headed for a sealed column is sent for sealing, and
-        the service decides what comes back. In normal use this doesn't double-seal anything, because
-        the app only ever handles opened values.
+        The trouble is that anyone can type something shaped like a sealed value. A string that
+        starts with <code>ms1:</code> but has plaintext after it passed the check and was stored
+        exactly as it arrived, in a column everyone believed was sealed. You can try it here:
       </p>
 
-      <h2>One round trip, not one per field</h2>
+      <div class="demo" data-demo="prefix">
+        <p class="cap">Type a value to save into a sealed column</p>
+        <label class="seg-label" for="prefix-input">Value</label>
+        <input id="prefix-input" type="text" value="ms1:Dana Whitfield, +61 412 555 019" spellcheck="false" autocomplete="off">
+        <div class="pair">
+          <div>
+            <h4>Skip anything that looks sealed</h4>
+            <div class="v leak" data-out="naive">ms1:Dana Whitfield, +61 412 555 019</div>
+            <p data-note="naive">Stored as typed. Plaintext is now sitting in a column everyone believes is sealed.</p>
+          </div>
+          <div>
+            <h4>Seal everything</h4>
+            <div class="v sealed" data-out="always">ms1:AQAAAEAAAAC…</div>
+            <p>Sealed, whatever it looked like on the way in.</p>
+          </div>
+        </div>
+        <p class="fine">An illustration. The ciphertext shown isn't real.</p>
+      </div>
+
       <p>
-        A page of bookings with their attendees can hold dozens of sealed values. The extension
-        collects every sealed field in a result, including the included relations, and opens them in
-        one batch: a single fan-out to the network instead of one per field. The fork's notes point at
-        the next step for production, which is to protect one data key per record with the network and
-        encrypt that record's fields locally under it, so the cost is one network operation per record
-        however many fields it has.
+        A local check can't tell a real sealed value from a fake one, because telling them apart means
+        verifying a signature from the vendor key, and only the network can do that. We dropped the
+        shortcut and now send every non-empty value headed for a sealed column to be sealed. To stop
+        the double-sealing problem coming back, the app makes sure it only ever handles opened
+        values, so an unchanged field goes back as plaintext and gets sealed once. Cal.com's extension
+        was written after this, which is why its comments are so insistent about not skipping the
+        prefix.
       </p>
 
-      <h2>Who is reading</h2>
+      <h2>A field we thought was sealed and wasn't</h2>
       <p>
-        There's no service account that can open everything. The session middleware attaches the
-        signed-in user to each authenticated request, and the sealing service decrypts as that user,
-        and only if the quorum's grant says they hold the reading role. A request with no reader gets
-        ciphertext. That takes away the most useful thing an attacker could hope to find on the
-        server, which is a credential that decrypts whatever it's asked to.
+        Twenty stores a person's secondary links as a JSON string holding a list, and we wanted to seal
+        both the URL and the label of each link. Two separate paths into the same field each parsed
+        that string into its own copy of the list, sealed their part, and wrote their copy back. The
+        second write won, so a link's label ended up sealed while its URL sat in the clear right next
+        to it. The fix was to parse the list once and share it between both paths.
+      </p>
+      <p>
+        Around the same time we noticed task titles and bodies, and note bodies, had been left
+        readable while the fields beside them were sealed. None of these showed up as errors, and
+        that's the uncomfortable part of this kind of bug: the app behaves the same whether a field is
+        sealed or not, so the only reliable check is to look at what Postgres has actually stored.
       </p>
 
-      <h2>What you give up</h2>
+      <h2>Opening a page of results in one go</h2>
       <p>
-        Search and sort on the sealed columns, a network call on reads that open fields, and some care
-        about which fields are really lookup keys. In return, a copy of the database or a backup holds
-        ciphertext for the fields that matter, and whether anyone can read them depends on a role your
-        admins approved rather than on the app.
+        The first version made one network round trip per field. That was fine for a single record
+        and painful for a list, and it made sealing a table of existing records impractical. Now the
+        extension collects every sealed value in a result, including the included attendees, and
+        opens them together in a single fan-out to the network. For production, the fork's notes
+        suggest going one step further: protect one data key per record with the network and encrypt
+        that record's fields locally under it, so the cost is one network operation per record no
+        matter how many fields it has.
+      </p>
+
+      <h2>Who does the reading</h2>
+      <p>
+        There's no service account that can open everything. Cal.com's session middleware attaches
+        the signed-in user to each request, and the sealing service decrypts as that user, and only
+        if the quorum's grant says they hold the reading role. A request without a user gets
+        ciphertext back. That means there's no credential on the server that an attacker could use to
+        decrypt whatever they like, which is usually the first thing they'd go looking for.
+      </p>
+
+      <h2>What it costs</h2>
+      <p>
+        You lose search and sorting on the sealed columns, reads that open fields make a network call,
+        and you have to be honest about which personal fields are really lookup keys. What you get is
+        a database, and every backup of it, where the fields that matter are ciphertext, and where
+        reading them depends on a role your admins approved rather than on the app.
       </p>
       <p>
-        The <a href="../projects/cal/">Cal.diy project page</a> summarises what the fork seals, and the
-        <a href="https://github.com/sashyo/cal.diy">fork itself</a> has the full change. If you're doing
-        this to your own Prisma app and get stuck, <a href="https://discord.gg/XBMd9ny2q5">ask in the
-        Discord</a>.
+        The <a href="../projects/cal/">Cal.diy project page</a> lists what the fork seals, and the
+        <a href="https://github.com/sashyo/cal.diy">fork itself</a> has the whole change. The
+        <a href="../projects/formbricks/">Formbricks</a> and <a href="../projects/twenty/">Twenty</a>
+        pages cover the other two. If you're trying this on your own Prisma app and get stuck,
+        <a href="https://discord.gg/XBMd9ny2q5">come ask in the Discord</a>.
       </p>
 
       <p style="margin-top:34px">
@@ -209,5 +277,6 @@
     </footer>
   </main>
 </div>
+<script src="../assets/demos.js"></script>
 </body>
 </html>

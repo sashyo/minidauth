@@ -189,7 +189,7 @@ def page(title, desc, canonical, r, current, ld, body):
 <link rel="icon" href="{r}favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="{r}assets/apple-touch-icon.png">
 {FONTS}
-<link rel="stylesheet" href="{r}styles.css">
+<link rel="stylesheet" href="{r}styles.css?v=20260917">
 <script type="application/ld+json">
 {json.dumps(ld, indent=2)}
 </script>
