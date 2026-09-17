@@ -163,8 +163,8 @@ amount=5000;to=alice</pre>
           <dd>The open source CRM. Contact fields are sealed record by record and a read takes a signed identity holding the role, so an unauthenticated call gets ciphertext and nothing else. The fork is the whole change, and Twenty's own login is untouched.</dd>
         </div>
         <div class="row">
-          <dt>WordPress <span class="chip">Early</span></dt>
-          <dd>A plugin that encrypts chosen post and user fields through minidauth, so a WordPress database backup stops being a copy of everything in it.</dd>
+          <dt><a href="https://github.com/sashyo/cal.diy">Cal.diy</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dd>Cal.com's open source scheduling platform. Attendee names and phone numbers, and booking titles and descriptions, are sealed before they reach Postgres. Each request opens them as its own signed-in user, and only if the quorum granted that user the reading role. With no reader in the request, the field simply stays sealed.</dd>
         </div>
       </dl>
       <p style="margin-top:28px">
