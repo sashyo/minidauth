@@ -141,6 +141,7 @@ FOOTER = '''    <footer>
         <a href="{r}blog/">Blog</a>
         <a href="https://github.com/sashyo/minidauth">GitHub</a>
         <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
       </nav>
     </footer>'''
 
@@ -305,6 +306,10 @@ def provider_page(p):
       <p style="margin-top:24px">
         minidauth itself has to be running first, with a vendor key created and its policies
         deployed. The <a href="{r}#start">quick start</a> is two Docker commands.
+      </p>
+      <p>
+        Stuck on the {n} side? <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and
+        I'll help you get it running.
       </p>
       <p class="micro">Also works with: {others}</p>
     </section>
