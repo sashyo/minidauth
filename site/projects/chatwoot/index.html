@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sealed contacts and conversations for Chatwoot · minidauth</title>
-<meta name="description" content="A Chatwoot fork where a contact's name and phone and the body of every support message are sealed before they reach Postgres, and open only for an agent holding a quorum-granted role.">
+<meta name="description" content="A Chatwoot fork where a contact&#x27;s name and phone and the body of every support message are sealed before they reach Postgres, and open only for an agent holding a quorum-granted role.">
 <link rel="canonical" href="https://www.dauth.me/projects/chatwoot/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
 <meta property="og:title" content="Sealed contacts and conversations for Chatwoot · minidauth">
-<meta property="og:description" content="A Chatwoot fork where a contact's name and phone and the body of every support message are sealed before they reach Postgres, and open only for an agent holding a quorum-granted role.">
+<meta property="og:description" content="A Chatwoot fork where a contact&#x27;s name and phone and the body of every support message are sealed before they reach Postgres, and open only for an agent holding a quorum-granted role.">
 <meta property="og:url" content="https://www.dauth.me/projects/chatwoot/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -34,16 +34,38 @@
       "description": "A Chatwoot fork where a contact's name and phone and the body of every support message are sealed before they reach Postgres, and open only for an agent holding a quorum-granted role.",
       "url": "https://www.dauth.me/projects/chatwoot/",
       "about": [
-        { "@type": "SoftwareApplication", "name": "minidauth" },
-        { "@type": "SoftwareSourceCode", "name": "Chatwoot", "codeRepository": "https://github.com/sashyo/chatwoot" }
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Chatwoot",
+          "codeRepository": "https://github.com/sashyo/chatwoot"
+        }
       ]
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "minidauth", "item": "https://www.dauth.me/" },
-        { "@type": "ListItem", "position": 2, "name": "Projects", "item": "https://www.dauth.me/projects/" },
-        { "@type": "ListItem", "position": 3, "name": "Chatwoot", "item": "https://www.dauth.me/projects/chatwoot/" }
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Projects",
+          "item": "https://www.dauth.me/projects/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Chatwoot",
+          "item": "https://www.dauth.me/projects/chatwoot/"
+        }
       ]
     }
   ]
@@ -73,7 +95,7 @@
       <h1>Chatwoot + minidauth <span>support conversations only a granted agent can read</span></h1>
       <p class="lede">A support tool holds who your customers are and everything they told your team. In this fork of Chatwoot, the open source Zendesk alternative, a contact's name and phone and the body of every message are sealed before they reach Postgres, and open only for an agent a quorum granted the reading role. It is the first non-Node integration, proving the sealing sidecar is language-agnostic.</p>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="https://github.com/sashyo/chatwoot/tree/minidauth-sealing">Open the fork</a>
+        <a class="btn btn--primary" href="https://github.com/sashyo/chatwoot">Open the fork</a>
         <a class="btn" href="https://github.com/chatwoot/chatwoot">Upstream Chatwoot</a>
       </div>
       <p class="micro"><span class="chip chip--live">Run end to end</span></p>
@@ -81,7 +103,7 @@
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Chatwoot is the open source customer support platform, written in Ruby on Rails. These fields are stored as ciphertext, and nothing on the server can decrypt them. A contact's email stays in the clear, because it is a lookup key the tool matches on.</p>
+      <p>Chatwoot is the open source Zendesk alternative. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
           <dt>Contacts</dt>
@@ -112,14 +134,13 @@
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>A field opens only if minidauth's quorum grant says that agent holds the reading role. An agent without it sees ciphertext, and revoking it makes the same read go dark.</p>
+            <p>A field opens only if minidauth&#x27;s quorum grant says that agent holds the reading role. An agent without it sees ciphertext, and revoking it makes the same read go dark.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
-        The key that seals these fields exists only as shares across the Tide network, and a quorum of
-        nodes has to cooperate to use it. It is never on the Chatwoot server, so a stolen database or a
-        leaked backup reveals only ciphertext.
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Chatwoot server.
       </p>
     </section>
 
@@ -129,7 +150,7 @@
         <li>The sidecar holds no reading identity of its own. Opening is delegated per agent and gated on a quorum-granted role.</li>
         <li>With no agent in context, a field stays sealed, so there&#x27;s never an open decryption service to abuse.</li>
         <li>The Ruby side signs its short-lived reader token with a private key rather than a shared secret, so a copy of a config file is worthless.</li>
-        <li>The tool's derived, pre-rendered copy of a message is dropped on write, so it can&#x27;t shadow the sealed value.</li>
+        <li>The tool&#x27;s derived, pre-rendered copy of a message is dropped on write, so it can&#x27;t shadow the sealed value.</li>
       </ul>
     </section>
 

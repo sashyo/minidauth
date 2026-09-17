@@ -34,16 +34,38 @@
       "description": "A Medusa fork where customer and address personal data is sealed before it reaches Postgres, and opens only for a staff member holding a quorum-granted role.",
       "url": "https://www.dauth.me/projects/medusa/",
       "about": [
-        { "@type": "SoftwareApplication", "name": "minidauth" },
-        { "@type": "SoftwareSourceCode", "name": "Medusa", "codeRepository": "https://github.com/sashyo/medusa" }
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Medusa",
+          "codeRepository": "https://github.com/sashyo/medusa"
+        }
       ]
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "minidauth", "item": "https://www.dauth.me/" },
-        { "@type": "ListItem", "position": 2, "name": "Projects", "item": "https://www.dauth.me/projects/" },
-        { "@type": "ListItem", "position": 3, "name": "Medusa", "item": "https://www.dauth.me/projects/medusa/" }
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Projects",
+          "item": "https://www.dauth.me/projects/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Medusa",
+          "item": "https://www.dauth.me/projects/medusa/"
+        }
       ]
     }
   ]
@@ -81,7 +103,7 @@
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Medusa is the open source commerce platform. These fields are stored as ciphertext, and nothing on the server can decrypt them. A customer's email stays in the clear, because it is the lookup key the store matches on.</p>
+      <p>Medusa is the open source Shopify alternative. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
           <dt>Customers</dt>
@@ -89,7 +111,7 @@
         </div>
         <div class="row">
           <dt>Addresses</dt>
-          <dd>Name, phone, company, and the street lines - on customer and order addresses alike.</dd>
+          <dd>Name, phone, company, and the street lines, on customer and order addresses alike.</dd>
         </div>
       </dl>
     </section>
@@ -100,7 +122,7 @@
         <li>
           <div>
             <h3>Sealed on write</h3>
-            <p>One hook on Medusa's MikroORM base repository seals the chosen fields on create and update, so every module that stores them inherits it, and ciphertext is what reaches Postgres.</p>
+            <p>One hook on Medusa&#x27;s MikroORM base repository seals the chosen fields on create and update, so every module that stores them inherits it, and ciphertext is what reaches Postgres.</p>
           </div>
         </li>
         <li>
@@ -112,14 +134,13 @@
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>A field opens only if minidauth's quorum grant says that staff member holds the reading role. A staff member without it gets ciphertext, and revoking it makes the same query go dark.</p>
+            <p>A field opens only if minidauth&#x27;s quorum grant says that staff member holds the reading role. A staff member without it gets ciphertext, and revoking it makes the same query go dark.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
-        The key that seals these fields exists only as shares across the Tide network, and a quorum of
-        nodes has to cooperate to use it. It is never on the Medusa server, so a stolen database or a
-        leaked backup reveals only ciphertext.
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Medusa server.
       </p>
     </section>
 
@@ -139,7 +160,7 @@
         Want to do the same for another app, or stuck running this one?
         <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
       </p>
-      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../../integrations/">Integrations</a></p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../../integrations/">Integrations</a></p>
     </section>
 
     <footer>

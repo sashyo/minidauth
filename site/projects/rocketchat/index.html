@@ -34,16 +34,38 @@
       "description": "A Rocket.Chat fork where the text of every message is sealed before it reaches MongoDB, and opens only for a member holding a quorum-granted role, over history and in real time.",
       "url": "https://www.dauth.me/projects/rocketchat/",
       "about": [
-        { "@type": "SoftwareApplication", "name": "minidauth" },
-        { "@type": "SoftwareSourceCode", "name": "Rocket.Chat", "codeRepository": "https://github.com/sashyo/Rocket.Chat" }
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Rocket.Chat",
+          "codeRepository": "https://github.com/sashyo/Rocket.Chat"
+        }
       ]
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "minidauth", "item": "https://www.dauth.me/" },
-        { "@type": "ListItem", "position": 2, "name": "Projects", "item": "https://www.dauth.me/projects/" },
-        { "@type": "ListItem", "position": 3, "name": "Rocket.Chat", "item": "https://www.dauth.me/projects/rocketchat/" }
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Projects",
+          "item": "https://www.dauth.me/projects/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Rocket.Chat",
+          "item": "https://www.dauth.me/projects/rocketchat/"
+        }
       ]
     }
   ]
@@ -73,7 +95,7 @@
       <h1>Rocket.Chat + minidauth <span>a chat server whose messages the database can't read</span></h1>
       <p class="lede">A chat server's most sensitive data is the message itself. In this fork of Rocket.Chat, the open source Slack alternative, a message's text is sealed before it reaches MongoDB, and opens back to plaintext only for a member a quorum granted the reading role, both when loading history and as messages arrive live.</p>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="https://github.com/sashyo/Rocket.Chat/tree/develop">Open the fork</a>
+        <a class="btn btn--primary" href="https://github.com/sashyo/Rocket.Chat">Open the fork</a>
         <a class="btn" href="https://github.com/RocketChat/Rocket.Chat">Upstream Rocket.Chat</a>
       </div>
       <p class="micro"><span class="chip chip--live">Run end to end</span></p>
@@ -81,7 +103,7 @@
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Rocket.Chat is the open source team chat platform. The message body is stored as ciphertext, and nothing on the server can decrypt it. The keys the app routes on stay in the clear, so the chat keeps working.</p>
+      <p>Rocket.Chat is the open source Slack alternative. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
           <dt>Messages</dt>
@@ -96,26 +118,25 @@
         <li>
           <div>
             <h3>Sealed at the model layer</h3>
-            <p>One hook on Rocket.Chat's MongoDB base repository seals the message body on insert and update, so every write goes through the same place, and ciphertext is what reaches MongoDB.</p>
+            <p>One hook on Rocket.Chat&#x27;s MongoDB base repository seals the message body on insert and update, so every write goes through the same place, and ciphertext is what reaches MongoDB.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Opened per reader, in history and live</h3>
-            <p>Loading a room opens the body as the requesting member through the common message normaliser. A message that arrives live opens per recipient, by reusing Rocket.Chat's own per-subscription transform in the streamer.</p>
+            <p>Loading a room opens the body as the requesting member through the common message normaliser. A message that arrives live opens per recipient, by reusing Rocket.Chat&#x27;s own per-subscription transform in the streamer.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>A message opens only if minidauth's quorum grant says that member holds the reading role. A member without it sees ciphertext in the very same room, and revoking it makes reads go dark.</p>
+            <p>A message opens only if minidauth&#x27;s quorum grant says that member holds the reading role. A member without it sees ciphertext in the very same room, and revoking it makes reads go dark.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
-        The key that seals these messages exists only as shares across the Tide network, and a quorum of
-        nodes has to cooperate to use it. It is never on the Rocket.Chat server, so a stolen database or a
-        leaked backup reveals only ciphertext.
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Rocket.Chat server.
       </p>
     </section>
 

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open source apps using minidauth: Twenty, Cal.diy, Formbricks, Documenso, Medusa, Rocket.Chat, Chatwoot</title>
-<meta name="description" content="Forks of Twenty, Cal.diy, Formbricks, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot</title>
+<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <link rel="canonical" href="https://www.dauth.me/projects/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Open source apps using minidauth: Twenty, Cal.diy, Formbricks, Documenso, Medusa, Rocket.Chat, Chatwoot">
-<meta property="og:description" content="Forks of Twenty, Cal.diy, Formbricks, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot">
+<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat and Chatwoot where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <meta property="og:url" content="https://www.dauth.me/projects/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -125,28 +125,28 @@
           <time><span class="chip chip--live">Run end to end</span></time>
           <div>
             <h3>Documenso</h3>
-            <p>A signed document knows the parties, the terms and the signatures. In this fork of the open source DocuSign alternative, those fields are sealed before they reach Postgres, opened only for a quorum-granted reader, and each completion is threshold-signed by the Tide network so no operator can forge it.</p>
+            <p>A signed document is a promise, and the database that holds it knows the parties, the terms and the signatures. In this fork of Documenso, the open source DocuSign alternative, those fields are sealed before they reach Postgres, open only for a signed-in user a quorum granted the role, and each completion is threshold-signed by the Tide network so no operator can forge it.</p>
           </div>
         </a>
         <a class="post-link" href="medusa/">
           <time><span class="chip chip--live">Run end to end</span></time>
           <div>
             <h3>Medusa</h3>
-            <p>A commerce database is the classic breach: names, addresses and phone numbers. In this fork of the open source Shopify alternative, that personal data is sealed before it reaches Postgres and opens only for a staff member a quorum granted the reading role.</p>
+            <p>A commerce database is the classic breach: it knows who your customers are, where they live and how to reach them. In this fork of Medusa, the open source Shopify alternative, that personal data is sealed before it reaches Postgres and opens again in-request only for a staff member a quorum granted the reading role.</p>
           </div>
         </a>
         <a class="post-link" href="rocketchat/">
           <time><span class="chip chip--live">Run end to end</span></time>
           <div>
             <h3>Rocket.Chat</h3>
-            <p>A chat server's most sensitive data is the message text itself. In this fork of the open source Slack alternative, a message's body is sealed before it reaches MongoDB and opens only for a member a quorum granted the reading role, both over history and as messages arrive live.</p>
+            <p>A chat server's most sensitive data is the message itself. In this fork of Rocket.Chat, the open source Slack alternative, a message's text is sealed before it reaches MongoDB, and opens back to plaintext only for a member a quorum granted the reading role, both when loading history and as messages arrive live.</p>
           </div>
         </a>
         <a class="post-link" href="chatwoot/">
           <time><span class="chip chip--live">Run end to end</span></time>
           <div>
             <h3>Chatwoot</h3>
-            <p>A support desk holds your customers' details and everything they told your team. In this fork of the open source Zendesk alternative, a contact's name and phone and every message body are sealed before Postgres and open only for an agent a quorum granted the role. The first non-Node integration.</p>
+            <p>A support tool holds who your customers are and everything they told your team. In this fork of Chatwoot, the open source Zendesk alternative, a contact's name and phone and the body of every message are sealed before they reach Postgres, and open only for an agent a quorum granted the reading role. It is the first non-Node integration, proving the sealing sidecar is language-agnostic.</p>
           </div>
         </a>
       </div>

@@ -92,7 +92,7 @@
 
     <header class="hero">
       <p class="label"><a href="../">Projects</a> / Documenso</p>
-      <h1>Documenso + minidauth <span>sealed at rest, opened for the reader, signed by a quorum</span></h1>
+      <h1>Documenso + minidauth <span>documents sealed at rest, opened for the reader, signed by a quorum</span></h1>
       <p class="lede">A signed document is a promise, and the database that holds it knows the parties, the terms and the signatures. In this fork of Documenso, the open source DocuSign alternative, those fields are sealed before they reach Postgres, open only for a signed-in user a quorum granted the role, and each completion is threshold-signed by the Tide network so no operator can forge it.</p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="https://github.com/sashyo/documenso">Open the fork</a>
@@ -103,7 +103,7 @@
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Documenso is the open source e-signature platform. These fields are stored as ciphertext, and nothing on the server can decrypt them. The recipient's email stays in the clear, because it is the routing and signing-link key the database must match on.</p>
+      <p>Documenso is the open source DocuSign alternative. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
           <dt>Documents</dt>
@@ -136,7 +136,7 @@
         <li>
           <div>
             <h3>Opened per user</h3>
-            <p>Each authenticated request runs as its signed-in user; a recipient opening a signing link opens the document on the owner's reading authority once their token is verified.</p>
+            <p>Each authenticated request runs as its signed-in user; a recipient opening a signing link opens the document on the owner&#x27;s reading authority once their token is verified.</p>
           </div>
         </li>
         <li>
@@ -153,9 +153,8 @@
         </li>
       </ol>
       <p style="margin-top:24px">
-        The key that seals and signs these records exists only as shares across the Tide network, and a
-        quorum of nodes has to cooperate to use it. It is never on the Documenso server, so no operator,
-        and no stolen database, can read a sealed field or forge a completed signature.
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Documenso server.
       </p>
     </section>
 
@@ -170,12 +169,12 @@
 
     <section id="status">
       <h2>Status and running it</h2>
-      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Documenso. The fork's <a href="https://github.com/sashyo/documenso">README</a> covers setup against a running minidauth, including the separate signing key.</p>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Documenso. The fork's <a href="https://github.com/sashyo/documenso">README</a> covers setup against a running minidauth.</p>
       <p>
         Want to do the same for another app, or stuck running this one?
         <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
       </p>
-      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../../integrations/">Integrations</a></p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../../integrations/">Integrations</a></p>
     </section>
 
     <footer>
