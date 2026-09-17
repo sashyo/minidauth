@@ -3,15 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>minidauth</title>
+<title>minidauth: threshold encryption, signing and roles for any login</title>
 <meta name="description" content="minidauth gives your existing login a key nobody holds. The key exists only as shares across the Tide network, signs every token, policy and role grant, and decides who may decrypt. Keep Cognito, Clerk, Supabase, Better Auth or Auth0 as they are.">
 <link rel="canonical" href="https://www.dauth.me/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="minidauth">
+<meta property="og:title" content="minidauth: threshold encryption, signing and roles for any login">
 <meta property="og:site_name" content="minidauth">
 <meta property="og:description" content="Give your existing login a key that nobody holds. A stolen copy of your database contains nothing readable, and no key to make it readable.">
 <meta property="og:url" content="https://www.dauth.me/">
 <meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
 <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,6 +50,7 @@
     <a class="pill" href="#start">Try it</a>
     <div class="foot">
       <a class="pill" href="integrations/">Integrations</a>
+      <a class="pill" href="projects/">Projects</a>
       <a class="pill" href="blog/">Blog</a>
       <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
     </div>
@@ -151,20 +157,20 @@ amount=5000;to=alice</pre>
       <h2>Projects it has been added to</h2>
       <p>
         Open source apps with their own logins, their own databases and no interest in changing
-        either. Each name below is the fork, so you can read the whole change as a diff against
-        upstream. The minidauth side is the same three steps in every one of them.
+        either. Each name below leads to a page on what was sealed and how, with a link to the fork so you can
+        read the whole change as a diff against upstream. The minidauth side is the same three steps in every one of them.
       </p>
       <dl class="rows">
         <div class="row">
-          <dt><a href="https://github.com/sashyo/formbricks">Formbricks</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dt><a href="projects/formbricks/">Formbricks</a> <span class="chip chip--live">Run end to end</span></dt>
           <dd>The open source survey platform. Answers are sealed before they reach Postgres and opened only for a <code>response-reader</code> role a quorum granted. Take the role away and the same dashboard shows nothing readable, with no change to Formbricks' own login.</dd>
         </div>
         <div class="row">
-          <dt><a href="https://github.com/sashyo/twenty">Twenty</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dt><a href="projects/twenty/">Twenty</a> <span class="chip chip--live">Run end to end</span></dt>
           <dd>The open source CRM. Contact fields are sealed record by record and a read takes a signed identity holding the role, so an unauthenticated call gets ciphertext and nothing else. The fork is the whole change, and Twenty's own login is untouched.</dd>
         </div>
         <div class="row">
-          <dt><a href="https://github.com/sashyo/cal.diy">Cal.diy</a> <span class="chip chip--live">Run end to end</span></dt>
+          <dt><a href="projects/cal/">Cal.diy</a> <span class="chip chip--live">Run end to end</span></dt>
           <dd>Cal.com's open source scheduling platform. Attendee names and phone numbers, and booking titles and descriptions, are sealed before they reach Postgres. Each request opens them as its own signed-in user, and only if the quorum granted that user the reading role. With no reader in the request, the field simply stays sealed.</dd>
         </div>
       </dl>
@@ -283,6 +289,7 @@ MC_ADMIN_TOKEN=$(openssl rand -hex 32) docker compose --profile public up</pre>
       </div>
       <nav>
         <a href="integrations/">Integrations</a>
+        <a href="projects/">Projects</a>
         <a href="blog/">Blog</a>
         <a href="https://github.com/sashyo/minidauth">GitHub</a>
         <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>

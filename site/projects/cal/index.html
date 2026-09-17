@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encrypted booking and attendee data for Cal.com · minidauth</title>
+<meta name="description" content="A Cal.diy (Cal.com) fork where attendee names and phone numbers and booking details are sealed before they reach Postgres, and open only for the signed-in user holding a quorum-granted role.">
+<link rel="canonical" href="https://www.dauth.me/projects/cal/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Encrypted booking and attendee data for Cal.com · minidauth">
+<meta property="og:description" content="A Cal.diy (Cal.com) fork where attendee names and phone numbers and booking details are sealed before they reach Postgres, and open only for the signed-in user holding a quorum-granted role.">
+<meta property="og:url" content="https://www.dauth.me/projects/cal/">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Encrypted booking and attendee data for Cal.com",
+      "description": "A Cal.diy (Cal.com) fork where attendee names and phone numbers and booking details are sealed before they reach Postgres, and open only for the signed-in user holding a quorum-granted role.",
+      "url": "https://www.dauth.me/projects/cal/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Cal.diy",
+          "codeRepository": "https://github.com/sashyo/cal.diy"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Projects",
+          "item": "https://www.dauth.me/projects/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cal.diy",
+          "item": "https://www.dauth.me/projects/cal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/">Integrations</a>
+    <a class="pill" href="../../projects/" aria-current="page">Projects</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Projects</a> / Cal.diy</p>
+      <h1>Cal.diy + minidauth <span>bookings that open only for the right person</span></h1>
+      <p class="lede">Every booking carries someone's name, phone number and the reason they're meeting. In this fork of Cal.com's scheduling platform, those fields are sealed before they reach Postgres, and each request can only open them as its own signed-in user.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/cal.diy">Open the fork</a>
+        <a class="btn" href="https://github.com/calcom/cal.diy">Upstream Cal.diy</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="sealed">
+      <h2>What gets sealed</h2>
+      <p>Cal.diy is Cal.com's open source scheduling platform. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <dl class="rows">
+        <div class="row">
+          <dt>Attendees</dt>
+          <dd>Name and phone number.</dd>
+        </div>
+        <div class="row">
+          <dt>Bookings</dt>
+          <dd>Title and description.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="wiring">
+      <h2>How it's wired</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Sealed on write</h3>
+            <p>A Prisma client extension seals the chosen fields before they reach Postgres and handles them again on the way out.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Opened per user</h3>
+            <p>Each authenticated request runs as its signed-in user, so a sealed field opens only for that verified user.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Gated by a quorum role</h3>
+            <p>The field opens only if minidauth&#x27;s quorum grant says that user holds the reading role.</p>
+          </div>
+        </li>
+      </ol>
+      <p style="margin-top:24px">
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Cal.diy server.
+      </p>
+    </section>
+
+    <section id="hardening">
+      <h2>Details that matter</h2>
+      <ul class="prose">
+        <li>The sealing sidecar holds no reading identity of its own. Opening is delegated per user.</li>
+        <li>With no reader in the request, a field simply stays sealed, so there&#x27;s never an open decryption service to abuse.</li>
+        <li>Every inbound value is sealed, so plaintext never reaches a sealed column.</li>
+      </ul>
+    </section>
+
+    <section id="status">
+      <h2>Status and running it</h2>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Cal.diy. The fork's <a href="https://github.com/sashyo/cal.diy">README</a> covers setup against a running minidauth.</p>
+      <p>
+        Want to do the same for another app, or stuck running this one?
+        <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
+      </p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../../integrations/">Integrations</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../projects/">Projects</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>

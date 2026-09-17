@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field-level encryption for Twenty CRM · minidauth</title>
+<meta name="description" content="A Twenty CRM fork where contact details, notes and tasks are sealed before they reach Postgres and decrypted only in the browser, for users holding a quorum-granted role.">
+<link rel="canonical" href="https://www.dauth.me/projects/twenty/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="minidauth">
+<meta property="og:title" content="Field-level encryption for Twenty CRM · minidauth">
+<meta property="og:description" content="A Twenty CRM fork where contact details, notes and tasks are sealed before they reach Postgres and decrypted only in the browser, for users holding a quorum-granted role.">
+<meta property="og:url" content="https://www.dauth.me/projects/twenty/">
+<meta property="og:image" content="https://www.dauth.me/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://www.dauth.me/assets/og.png">
+<link rel="icon" href="../../assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@400&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "Field-level encryption for Twenty CRM",
+      "description": "A Twenty CRM fork where contact details, notes and tasks are sealed before they reach Postgres and decrypted only in the browser, for users holding a quorum-granted role.",
+      "url": "https://www.dauth.me/projects/twenty/",
+      "about": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "minidauth"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Twenty",
+          "codeRepository": "https://github.com/sashyo/twenty"
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "minidauth",
+          "item": "https://www.dauth.me/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Projects",
+          "item": "https://www.dauth.me/projects/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Twenty",
+          "item": "https://www.dauth.me/projects/twenty/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <a class="brand" href="../../" aria-label="minidauth, home"><img src="../../assets/logo.svg" alt="minidauth" width="430" height="100"></a>
+    <div class="knee" aria-hidden="true"></div>
+    <a class="pill" href="../../">Overview</a>
+    <a class="pill" href="../../integrations/">Integrations</a>
+    <a class="pill" href="../../projects/" aria-current="page">Projects</a>
+    <a class="pill" href="../../#start">Try it</a>
+    <div class="foot">
+      <a class="pill" href="../../blog/">Blog</a>
+      <a class="pill" href="https://github.com/sashyo/minidauth">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <header class="hero">
+      <p class="label"><a href="../">Projects</a> / Twenty</p>
+      <h1>Twenty + minidauth <span>contact data the server never sees in the clear</span></h1>
+      <p class="lede">A CRM is a list of people and everything a team knows about them. In this fork, the personal fields in Twenty are sealed before they reach Postgres and decrypted in the browser, so the server and its database only ever hold ciphertext.</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/sashyo/twenty">Open the fork</a>
+        <a class="btn" href="https://github.com/twentyhq/twenty">Upstream Twenty</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="sealed">
+      <h2>What gets sealed</h2>
+      <p>Twenty is the open source CRM. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <dl class="rows">
+        <div class="row">
+          <dt>People</dt>
+          <dd>Name, emails and phone numbers (including the additional ones), job title and city.</dd>
+        </div>
+        <div class="row">
+          <dt>Links</dt>
+          <dd>LinkedIn and X links, both their URLs and their labels.</dd>
+        </div>
+        <div class="row">
+          <dt>Notes and tasks</dt>
+          <dd>Note bodies, and task titles and bodies.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="wiring">
+      <h2>How it's wired</h2>
+      <ol class="steps">
+        <li>
+          <div>
+            <h3>Sealed at the shared ORM</h3>
+            <p>Hooks in Twenty&#x27;s workspace repository seal on insert, update and save, and handle reads, so every object goes through the same choke point.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Decrypted in the browser</h3>
+            <p>An Apollo link decrypts sealed fields client-side, using a session-bound token and a proof of possession tied to each request.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Gated by a quorum role</h3>
+            <p>Reading needs a crm-reader role the quorum granted, and revoking it takes effect across the whole instance with no deploy.</p>
+          </div>
+        </li>
+      </ol>
+      <p style="margin-top:24px">
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the Twenty server.
+      </p>
+    </section>
+
+    <section id="hardening">
+      <h2>Details that matter</h2>
+      <ul class="prose">
+        <li>The token that allows a reveal lives for 15 seconds and is bound to the browser&#x27;s session key.</li>
+        <li>A reveal token is only minted while a live server-side session exists, so a CRM token captured before logout can&#x27;t keep minting them.</li>
+        <li>Signing out revokes the minidauth session, and retries so the revocation doesn&#x27;t fail silently.</li>
+        <li>The dev server refuses to serve key files and .env files.</li>
+      </ul>
+    </section>
+
+    <section id="status">
+      <h2>Status and running it</h2>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Twenty. The fork's <a href="https://github.com/sashyo/twenty">README</a> covers setup against a running minidauth.</p>
+      <p>
+        Want to do the same for another app, or stuck running this one?
+        <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
+      </p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../cal/">Cal.diy</a> · <a href="../../integrations/">Integrations</a></p>
+    </section>
+
+    <footer>
+      <div>
+        MIT licensed. Built on the <a href="https://tide.org">Tide</a> network.
+        <span class="disclaimer">Early software, not production ready. The
+        <a href="https://github.com/sashyo/minidauth#honestly-what-is-proven">README</a> lists what
+        has been run against the live network and what has not.</span>
+      </div>
+      <nav>
+        <a href="../../integrations/">Integrations</a>
+        <a href="../../projects/">Projects</a>
+        <a href="../../blog/">Blog</a>
+        <a href="https://github.com/sashyo/minidauth">GitHub</a>
+        <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
+        <a href="https://discord.gg/XBMd9ny2q5">Discord</a>
+      </nav>
+    </footer>
+  </main>
+</div>
+
+<script src="../../site.js"></script>
+</body>
+</html>

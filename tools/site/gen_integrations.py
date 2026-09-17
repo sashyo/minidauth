@@ -138,6 +138,7 @@ FOOTER = '''    <footer>
       </div>
       <nav>
         <a href="{r}integrations/">Integrations</a>
+        <a href="{r}projects/">Projects</a>
         <a href="{r}blog/">Blog</a>
         <a href="https://github.com/sashyo/minidauth">GitHub</a>
         <a href="https://github.com/sashyo/minidauth/blob/main/docs/running.md">Docs</a>
@@ -147,7 +148,7 @@ FOOTER = '''    <footer>
 
 
 def rail(r, current):
-    items = [("Overview", r), ("Integrations", r + "integrations/")]
+    items = [("Overview", r), ("Integrations", r + "integrations/"), ("Projects", r + "projects/")]
     out = []
     for label, href in items:
         cur = ' aria-current="page"' if label == current else ""
@@ -178,6 +179,12 @@ def page(title, desc, canonical, r, current, ld, body):
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="{canonical}">
+<meta property="og:image" content="{BASE}/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="minidauth: give your existing login a key that nobody holds">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{BASE}/assets/og.png">
 <link rel="icon" href="{r}assets/mark.svg" type="image/svg+xml">
 {FONTS}
 <link rel="stylesheet" href="{r}styles.css">
@@ -375,13 +382,200 @@ def index_page():
                 url, r, "Integrations", ld, body)
 
 
+
+# Every fact below comes from the minidauth commits on each fork.
+PROJ = [
+    dict(
+        slug="formbricks", name="Formbricks", kind="the open source survey platform",
+        upstream="formbricks/formbricks", fork="sashyo/formbricks",
+        run_url="https://github.com/sashyo/formbricks/tree/main/integrations/minidauth",
+        title="Encrypted survey responses for Formbricks · minidauth",
+        desc="A Formbricks fork where survey answers and contact attributes are sealed before they reach Postgres, and only a quorum-granted role can read them. How it is wired, and how to run it.",
+        tagline="survey answers only a granted role can read",
+        lede="Formbricks collects survey answers, and those answers are often the most sensitive thing a company holds about its customers. In this fork, answers are sealed before they reach Postgres, and reading them takes a role that a quorum of admins granted.",
+        sealed=[("Survey answers", "The response data itself, which is every answer a respondent gave."),
+                ("Contact attributes", "The per-contact details Formbricks keeps alongside responses.")],
+        wiring=[("Sealed on write", "A Prisma client extension seals on create, update, upsert and createMany, so every path that stores a response goes through one place."),
+                ("Opened for a granted reader", "Reveals run in the browser with the reader's own session key. The server-side open endpoint is off by default, so the server never needs to see plaintext."),
+                ("Gated by a quorum role", "Reading needs a response-reader role the quorum granted. Revoke it in minidauth and reads stop, with no change to Formbricks or its login.")],
+        hardening=["A sealing sidecar does the work. It holds no key and no reading identity of its own, and only relays.",
+                   "The sidecar proves itself to minidauth with a private-key assertion rather than a shared bearer token, so a copy of the operators file is worthless.",
+                   "Every inbound value is sealed, including one that merely looks sealed already, so a forged envelope can't slip plaintext into the database.",
+                   "Sealing is idempotent, and batched into a single network fan-out.",
+                   "Signing out revokes the minidauth session too, and only the server can trigger that."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Formbricks.",
+    ),
+    dict(
+        slug="twenty", name="Twenty", kind="the open source CRM",
+        upstream="twentyhq/twenty", fork="sashyo/twenty",
+        run_url="https://github.com/sashyo/twenty",
+        title="Field-level encryption for Twenty CRM · minidauth",
+        desc="A Twenty CRM fork where contact details, notes and tasks are sealed before they reach Postgres and decrypted only in the browser, for users holding a quorum-granted role.",
+        tagline="contact data the server never sees in the clear",
+        lede="A CRM is a list of people and everything a team knows about them. In this fork, the personal fields in Twenty are sealed before they reach Postgres and decrypted in the browser, so the server and its database only ever hold ciphertext.",
+        sealed=[("People", "Name, emails and phone numbers (including the additional ones), job title and city."),
+                ("Links", "LinkedIn and X links, both their URLs and their labels."),
+                ("Notes and tasks", "Note bodies, and task titles and bodies.")],
+        wiring=[("Sealed at the shared ORM", "Hooks in Twenty's workspace repository seal on insert, update and save, and handle reads, so every object goes through the same choke point."),
+                ("Decrypted in the browser", "An Apollo link decrypts sealed fields client-side, using a session-bound token and a proof of possession tied to each request."),
+                ("Gated by a quorum role", "Reading needs a crm-reader role the quorum granted, and revoking it takes effect across the whole instance with no deploy.")],
+        hardening=["The token that allows a reveal lives for 15 seconds and is bound to the browser's session key.",
+                   "A reveal token is only minted while a live server-side session exists, so a CRM token captured before logout can't keep minting them.",
+                   "Signing out revokes the minidauth session, and retries so the revocation doesn't fail silently.",
+                   "The dev server refuses to serve key files and .env files."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Twenty.",
+    ),
+    dict(
+        slug="cal", name="Cal.diy", kind="Cal.com's open source scheduling platform",
+        upstream="calcom/cal.diy", fork="sashyo/cal.diy",
+        run_url="https://github.com/sashyo/cal.diy",
+        title="Encrypted booking and attendee data for Cal.com · minidauth",
+        desc="A Cal.diy (Cal.com) fork where attendee names and phone numbers and booking details are sealed before they reach Postgres, and open only for the signed-in user holding a quorum-granted role.",
+        tagline="bookings that open only for the right person",
+        lede="Every booking carries someone's name, phone number and the reason they're meeting. In this fork of Cal.com's scheduling platform, those fields are sealed before they reach Postgres, and each request can only open them as its own signed-in user.",
+        sealed=[("Attendees", "Name and phone number."),
+                ("Bookings", "Title and description.")],
+        wiring=[("Sealed on write", "A Prisma client extension seals the chosen fields before they reach Postgres and handles them again on the way out."),
+                ("Opened per user", "Each authenticated request runs as its signed-in user, so a sealed field opens only for that verified user."),
+                ("Gated by a quorum role", "The field opens only if minidauth's quorum grant says that user holds the reading role.")],
+        hardening=["The sealing sidecar holds no reading identity of its own. Opening is delegated per user.",
+                   "With no reader in the request, a field simply stays sealed, so there's never an open decryption service to abuse.",
+                   "Every inbound value is sealed, so plaintext never reaches a sealed column."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Cal.diy.",
+    ),
+]
+
+
+def rows(items):
+    return "\n".join(f"""        <div class="row">
+          <dt>{html.escape(a)}</dt>
+          <dd>{html.escape(b)}</dd>
+        </div>""" for a, b in items)
+
+
+def project_page(q):
+    r = "../../"
+    url = f"{BASE}/projects/{q['slug']}/"
+    others = " · ".join(f'<a href="../{o["slug"]}/">{o["name"]}</a>' for o in PROJ if o["slug"] != q["slug"])
+    steps = "\n".join(f"""        <li>
+          <div>
+            <h3>{html.escape(a)}</h3>
+            <p>{html.escape(b)}</p>
+          </div>
+        </li>""" for a, b in q["wiring"])
+    hard = "\n".join(f"        <li>{html.escape(h)}</li>" for h in q["hardening"])
+    n = q["name"]
+    body = f"""
+    <header class="hero">
+      <p class="label"><a href="../">Projects</a> / {n}</p>
+      <h1>{n} + minidauth <span>{q["tagline"]}</span></h1>
+      <p class="lede">{q["lede"]}</p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/{q["fork"]}">Open the fork</a>
+        <a class="btn" href="https://github.com/{q["upstream"]}">Upstream {n}</a>
+      </div>
+      <p class="micro"><span class="chip chip--live">Run end to end</span></p>
+    </header>
+
+    <section id="sealed">
+      <h2>What gets sealed</h2>
+      <p>{n} is {q["kind"]}. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <dl class="rows">
+{rows(q["sealed"])}
+      </dl>
+    </section>
+
+    <section id="wiring">
+      <h2>How it's wired</h2>
+      <ol class="steps">
+{steps}
+      </ol>
+      <p style="margin-top:24px">
+        The key that seals these fields exists only as shares across the Tide network, and 14 of 20
+        nodes have to cooperate to use it. It is never on the {n} server.
+      </p>
+    </section>
+
+    <section id="hardening">
+      <h2>Details that matter</h2>
+      <ul class="prose">
+{hard}
+      </ul>
+    </section>
+
+    <section id="status">
+      <h2>Status and running it</h2>
+      <p>{q["status"]} The fork's <a href="{q["run_url"]}">README</a> covers setup against a running minidauth.</p>
+      <p>
+        Want to do the same for another app, or stuck running this one?
+        <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
+      </p>
+      <p class="micro">Other projects: {others} · <a href="{r}integrations/">Integrations</a></p>
+    </section>
+"""
+    ld = {"@context": "https://schema.org", "@graph": [
+        {"@type": "TechArticle", "headline": q["title"].split(" · ")[0], "description": q["desc"], "url": url,
+         "about": [{"@type": "SoftwareApplication", "name": "minidauth"},
+                   {"@type": "SoftwareSourceCode", "name": n, "codeRepository": f"https://github.com/{q['fork']}"}]},
+        {"@type": "BreadcrumbList", "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "minidauth", "item": f"{BASE}/"},
+            {"@type": "ListItem", "position": 2, "name": "Projects", "item": f"{BASE}/projects/"},
+            {"@type": "ListItem", "position": 3, "name": n, "item": url}]}]}
+    return page(q["title"], q["desc"], url, r, "Projects", ld, body)
+
+
+def projects_index():
+    r = "../"
+    url = f"{BASE}/projects/"
+    items = "\n".join(f"""        <a class="post-link" href="{q["slug"]}/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>{q["name"]}</h3>
+            <p>{q["lede"]}</p>
+          </div>
+        </a>""" for q in PROJ)
+    body = f"""
+    <header class="hero">
+      <h1>Open source apps <span>with minidauth added</span></h1>
+      <p class="lede">
+        Real projects with their own logins and their own databases. Each fork seals the sensitive
+        fields before they reach Postgres, and reading them takes a role a quorum granted.
+      </p>
+      <p>Each one is off unless it's configured, so an unconfigured checkout behaves exactly like upstream.</p>
+    </header>
+
+    <section id="list">
+      <h2>Projects</h2>
+      <div class="posts">
+{items}
+      </div>
+      <p style="margin-top:28px">
+        Adding it to something else? <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and
+        I'll help you out.
+      </p>
+    </section>
+"""
+    ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Projects using minidauth", "url": url,
+          "hasPart": [{"@type": "TechArticle", "name": q["name"], "url": f"{BASE}/projects/{q['slug']}/"} for q in PROJ]}
+    return page("Open source apps using minidauth: Formbricks, Twenty, Cal.diy",
+                "Forks of Formbricks, Twenty and Cal.diy (Cal.com) where sensitive fields are sealed before they reach Postgres and only a quorum-granted role can read them.",
+                url, r, "Projects", ld, body)
+
+
+os.makedirs(f"{SITE}/projects", exist_ok=True)
+open(f"{SITE}/projects/index.html", "w").write(projects_index())
+for q in PROJ:
+    os.makedirs(f"{SITE}/projects/{q['slug']}", exist_ok=True)
+    open(f"{SITE}/projects/{q['slug']}/index.html", "w").write(project_page(q))
+
 os.makedirs(f"{SITE}/integrations", exist_ok=True)
 open(f"{SITE}/integrations/index.html", "w").write(index_page())
 for p in P:
     os.makedirs(f"{SITE}/integrations/{p['slug']}", exist_ok=True)
     open(f"{SITE}/integrations/{p['slug']}/index.html", "w").write(provider_page(p))
 
-pages = ["/", "/integrations/"] + [f"/integrations/{p['slug']}/" for p in P] + [
+pages = ["/", "/integrations/"] + [f"/integrations/{p['slug']}/" for p in P] + \
+    ["/projects/"] + [f"/projects/{q['slug']}/" for q in PROJ] + [
     "/blog/", "/blog/no-central-authority", "/blog/the-first-policy-is-the-only-one",
     "/blog/what-a-stolen-database-looks-like"]
 sm = ['<?xml version="1.0" encoding="UTF-8"?>',
@@ -390,4 +584,4 @@ sm += [f"  <url><loc>{BASE}{u}</loc></url>" for u in pages]
 sm.append("</urlset>")
 open(f"{SITE}/sitemap.xml", "w").write("\n".join(sm) + "\n")
 open(f"{SITE}/robots.txt", "w").write(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}/sitemap.xml\n")
-print("generated", len(P) + 1, "pages, sitemap with", len(pages), "urls")
+print("generated", len(P) + len(PROJ) + 2, "pages, sitemap with", len(pages), "urls")
