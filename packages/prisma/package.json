@@ -1,0 +1,50 @@
+{
+  "name": "minidauth-prisma",
+  "version": "0.1.0",
+  "description": "Seal selected Prisma fields with minidauth before they reach Postgres, and open them on read for a quorum-granted user. One Prisma client extension, config-driven.",
+  "keywords": [
+    "prisma",
+    "prisma-extension",
+    "field-level-encryption",
+    "encryption",
+    "pii",
+    "tokenization",
+    "minidauth",
+    "tide"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/sashyo/minidauth",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sashyo/minidauth.git",
+    "directory": "packages/prisma"
+  },
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@prisma/client": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "@prisma/client": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
