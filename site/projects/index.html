@@ -104,12 +104,18 @@
   <main>
 
     <header class="hero">
-      <h1>Open source apps <span>with minidauth added</span></h1>
+      <p class="label">Field-level encryption at rest, proven</p>
+      <h1>10 open-source apps <span>whose database can't read itself</span></h1>
       <p class="lede">
-        Real projects with their own logins and their own databases. Each fork seals the sensitive
-        fields before they reach Postgres, and reading them takes a role a quorum granted.
+        Not demos. Real projects with their own logins and their own databases, forked and made to
+        hold only ciphertext for the fields that matter.
       </p>
-      <p>Each one is off unless it's configured, so an unconfigured checkout behaves exactly like upstream.</p>
+      <p>
+        Each one seals the sensitive fields before they reach the database and opens them only for a
+        user a quorum granted the reading role. The same pattern works across
+        <strong>Node, Ruby, PHP and Python</strong>, and every fork is off unless it's configured,
+        so an unconfigured checkout behaves exactly like upstream.
+      </p>
     </header>
 
     <section id="list">
