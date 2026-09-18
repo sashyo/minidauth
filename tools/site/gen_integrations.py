@@ -560,6 +560,24 @@ PROJ = [
                    "The reader token is a short-lived Ed25519 assertion signed with a private key, so a copy of a config file is worthless."],
         status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Paperless-ngx.",
     ),
+    dict(
+        slug="openemr", name="OpenEMR", kind="the open source electronic health records system",
+        upstream="openemr/openemr", fork="sashyo/openemr",
+        run_url="https://github.com/sashyo/openemr/tree/minidauth-sealing",
+        title="Sealed patient records for OpenEMR · minidauth",
+        desc="An OpenEMR fork where a patient's name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician holding a quorum-granted role, even an administrator.",
+        tagline="a medical record the database itself can't read",
+        lede="A medical record is the most regulated, most sensitive data most software ever holds. In this fork of OpenEMR, the widely used open source electronic health records system, a patient's name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician a quorum granted the reading role, even an administrator. It seals a large legacy PHP app with no ORM, showing the sidecar reaches any stack.",
+        sealed=[("Patients", "Name, Social Security number, street address, phone numbers and email. Dates and coded fields stay in the clear, so scheduling and reports keep working.")],
+        wiring=[("Sealed on write", "A hook on the modern PatientService (the create and update choke point) and on the legacy create path seals the demographics before the row is written, so ciphertext is what reaches the database."),
+                ("Opened per user", "The common demographics readers open the fields for the signed-in user OpenEMR already tracks, so names shown in the chart, titles, tabs and the finder are plaintext for a verified reader."),
+                ("Gated by a quorum role", "A field opens only if minidauth's quorum grant says that user holds the reading role. Even an OpenEMR administrator who can open the chart sees ciphertext without it, and revoking it makes the same record go dark.")],
+        hardening=["The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.",
+                   "With no granted reader in the request, a field stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.",
+                   "You cannot even search the database for a Social Security number, because the column holds only ciphertext.",
+                   "The PHP side signs its short-lived reader token with a private Ed25519 key rather than a shared secret, so a copy of a config file is worthless."],
+        status="A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream OpenEMR.",
+    ),
 ]
 
 

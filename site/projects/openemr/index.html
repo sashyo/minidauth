@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Encrypted survey responses for Formbricks · minidauth</title>
-<meta name="description" content="A Formbricks fork where survey answers and contact attributes are sealed before they reach Postgres, and only a quorum-granted role can read them. How it is wired, and how to run it.">
-<link rel="canonical" href="https://www.dauth.me/projects/formbricks/">
+<title>Sealed patient records for OpenEMR · minidauth</title>
+<meta name="description" content="An OpenEMR fork where a patient&#x27;s name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician holding a quorum-granted role, even an administrator.">
+<link rel="canonical" href="https://www.dauth.me/projects/openemr/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Encrypted survey responses for Formbricks · minidauth">
-<meta property="og:description" content="A Formbricks fork where survey answers and contact attributes are sealed before they reach Postgres, and only a quorum-granted role can read them. How it is wired, and how to run it.">
-<meta property="og:url" content="https://www.dauth.me/projects/formbricks/">
+<meta property="og:title" content="Sealed patient records for OpenEMR · minidauth">
+<meta property="og:description" content="An OpenEMR fork where a patient&#x27;s name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician holding a quorum-granted role, even an administrator.">
+<meta property="og:url" content="https://www.dauth.me/projects/openemr/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -30,9 +30,9 @@
   "@graph": [
     {
       "@type": "TechArticle",
-      "headline": "Encrypted survey responses for Formbricks",
-      "description": "A Formbricks fork where survey answers and contact attributes are sealed before they reach Postgres, and only a quorum-granted role can read them. How it is wired, and how to run it.",
-      "url": "https://www.dauth.me/projects/formbricks/",
+      "headline": "Sealed patient records for OpenEMR",
+      "description": "An OpenEMR fork where a patient's name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician holding a quorum-granted role, even an administrator.",
+      "url": "https://www.dauth.me/projects/openemr/",
       "about": [
         {
           "@type": "SoftwareApplication",
@@ -40,8 +40,8 @@
         },
         {
           "@type": "SoftwareSourceCode",
-          "name": "Formbricks",
-          "codeRepository": "https://github.com/sashyo/formbricks"
+          "name": "OpenEMR",
+          "codeRepository": "https://github.com/sashyo/openemr"
         }
       ]
     },
@@ -63,8 +63,8 @@
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Formbricks",
-          "item": "https://www.dauth.me/projects/formbricks/"
+          "name": "OpenEMR",
+          "item": "https://www.dauth.me/projects/openemr/"
         }
       ]
     }
@@ -91,27 +91,23 @@
   <main>
 
     <header class="hero">
-      <p class="label"><a href="../">Projects</a> / Formbricks</p>
-      <h1>Formbricks + minidauth <span>survey answers only a granted role can read</span></h1>
-      <p class="lede">Formbricks collects survey answers, and those answers are often the most sensitive thing a company holds about its customers. In this fork, answers are sealed before they reach Postgres, and reading them takes a role that a quorum of admins granted.</p>
+      <p class="label"><a href="../">Projects</a> / OpenEMR</p>
+      <h1>OpenEMR + minidauth <span>a medical record the database itself can't read</span></h1>
+      <p class="lede">A medical record is the most regulated, most sensitive data most software ever holds. In this fork of OpenEMR, the widely used open source electronic health records system, a patient's name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician a quorum granted the reading role, even an administrator. It seals a large legacy PHP app with no ORM, showing the sidecar reaches any stack.</p>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="https://github.com/sashyo/formbricks">Open the fork</a>
-        <a class="btn" href="https://github.com/formbricks/formbricks">Upstream Formbricks</a>
+        <a class="btn btn--primary" href="https://github.com/sashyo/openemr">Open the fork</a>
+        <a class="btn" href="https://github.com/openemr/openemr">Upstream OpenEMR</a>
       </div>
       <p class="micro"><span class="chip chip--live">Run end to end</span></p>
     </header>
 
     <section id="sealed">
       <h2>What gets sealed</h2>
-      <p>Formbricks is the open source survey platform. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
+      <p>OpenEMR is the open source electronic health records system. These fields are stored as ciphertext, and nothing on the server can decrypt them.</p>
       <dl class="rows">
         <div class="row">
-          <dt>Survey answers</dt>
-          <dd>The response data itself, which is every answer a respondent gave.</dd>
-        </div>
-        <div class="row">
-          <dt>Contact attributes</dt>
-          <dd>The per-contact details Formbricks keeps alongside responses.</dd>
+          <dt>Patients</dt>
+          <dd>Name, Social Security number, street address, phone numbers and email. Dates and coded fields stay in the clear, so scheduling and reports keep working.</dd>
         </div>
       </dl>
     </section>
@@ -122,47 +118,46 @@
         <li>
           <div>
             <h3>Sealed on write</h3>
-            <p>A Prisma client extension seals on create, update, upsert and createMany, so every path that stores a response goes through one place.</p>
+            <p>A hook on the modern PatientService (the create and update choke point) and on the legacy create path seals the demographics before the row is written, so ciphertext is what reaches the database.</p>
           </div>
         </li>
         <li>
           <div>
-            <h3>Opened for a granted reader</h3>
-            <p>Reveals run in the browser with the reader&#x27;s own session key. The server-side open endpoint is off by default, so the server never needs to see plaintext.</p>
+            <h3>Opened per user</h3>
+            <p>The common demographics readers open the fields for the signed-in user OpenEMR already tracks, so names shown in the chart, titles, tabs and the finder are plaintext for a verified reader.</p>
           </div>
         </li>
         <li>
           <div>
             <h3>Gated by a quorum role</h3>
-            <p>Reading needs a response-reader role the quorum granted. Revoke it in minidauth and reads stop, with no change to Formbricks or its login.</p>
+            <p>A field opens only if minidauth&#x27;s quorum grant says that user holds the reading role. Even an OpenEMR administrator who can open the chart sees ciphertext without it, and revoking it makes the same record go dark.</p>
           </div>
         </li>
       </ol>
       <p style="margin-top:24px">
         The key that seals these fields exists only as shares across the Tide network, and 14 of 20
-        nodes have to cooperate to use it. It is never on the Formbricks server.
+        nodes have to cooperate to use it. It is never on the OpenEMR server.
       </p>
     </section>
 
     <section id="hardening">
       <h2>Details that matter</h2>
       <ul class="prose">
-        <li>A sealing sidecar does the work. It holds no key and no reading identity of its own, and only relays.</li>
-        <li>The sidecar proves itself to minidauth with a private-key assertion rather than a shared bearer token, so a copy of the operators file is worthless.</li>
-        <li>Every inbound value is sealed, including one that merely looks sealed already, so a forged envelope can&#x27;t slip plaintext into the database.</li>
-        <li>Sealing is idempotent, and batched into a single network fan-out.</li>
-        <li>Signing out revokes the minidauth session too, and only the server can trigger that.</li>
+        <li>The sidecar holds no reading identity of its own. Opening is delegated per user and gated on a quorum-granted role.</li>
+        <li>With no granted reader in the request, a field stays sealed, so a read fails safe to ciphertext and never leaks plaintext by accident.</li>
+        <li>You cannot even search the database for a Social Security number, because the column holds only ciphertext.</li>
+        <li>The PHP side signs its short-lived reader token with a private Ed25519 key rather than a shared secret, so a copy of a config file is worthless.</li>
       </ul>
     </section>
 
     <section id="status">
       <h2>Status and running it</h2>
-      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream Formbricks. The fork's <a href="https://github.com/sashyo/formbricks/tree/main/integrations/minidauth">README</a> covers setup against a running minidauth.</p>
+      <p>A proof of concept, off unless MINIDAUTH_SEAL_URL is set, so an unconfigured checkout behaves exactly like upstream OpenEMR. The fork's <a href="https://github.com/sashyo/openemr/tree/minidauth-sealing">README</a> covers setup against a running minidauth.</p>
       <p>
         Want to do the same for another app, or stuck running this one?
         <a href="https://discord.gg/XBMd9ny2q5">Join the Discord</a> and I'll help you out.
       </p>
-      <p class="micro">Other projects: <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../firefly/">Firefly III</a> · <a href="../paperless/">Paperless-ngx</a> · <a href="../openemr/">OpenEMR</a> · <a href="../../integrations/">Integrations</a></p>
+      <p class="micro">Other projects: <a href="../formbricks/">Formbricks</a> · <a href="../twenty/">Twenty</a> · <a href="../cal/">Cal.diy</a> · <a href="../documenso/">Documenso</a> · <a href="../medusa/">Medusa</a> · <a href="../rocketchat/">Rocket.Chat</a> · <a href="../chatwoot/">Chatwoot</a> · <a href="../firefly/">Firefly III</a> · <a href="../paperless/">Paperless-ngx</a> · <a href="../../integrations/">Integrations</a></p>
     </section>
 
     <footer>

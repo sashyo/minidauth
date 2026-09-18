@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx</title>
-<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III and Paperless-ngx where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<title>Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx, OpenEMR</title>
+<meta name="description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx and OpenEMR where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <link rel="canonical" href="https://www.dauth.me/projects/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="minidauth">
-<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx">
-<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III and Paperless-ngx where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
+<meta property="og:title" content="Open source apps using minidauth: Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx, OpenEMR">
+<meta property="og:description" content="Forks of Formbricks, Twenty, Cal.diy, Documenso, Medusa, Rocket.Chat, Chatwoot, Firefly III, Paperless-ngx and OpenEMR where sensitive fields are sealed before they reach the database and only a quorum-granted role can read them.">
 <meta property="og:url" content="https://www.dauth.me/projects/">
 <meta property="og:image" content="https://www.dauth.me/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -75,6 +75,11 @@
       "@type": "TechArticle",
       "name": "Paperless-ngx",
       "url": "https://www.dauth.me/projects/paperless/"
+    },
+    {
+      "@type": "TechArticle",
+      "name": "OpenEMR",
+      "url": "https://www.dauth.me/projects/openemr/"
     }
   ]
 }
@@ -171,6 +176,13 @@
           <div>
             <h3>Paperless-ngx</h3>
             <p>A document archive is a pile of exactly the things a breach is about: who wrote to you, what the letter said, the notes you took. In this fork of Paperless-ngx, a document's title, its full OCR text, the correspondent and the notes are sealed before they reach the database, and open only for a user a quorum granted the reading role. It is a first integration in Python and Django, further proving the sealing sidecar is language-agnostic.</p>
+          </div>
+        </a>
+        <a class="post-link" href="openemr/">
+          <time><span class="chip chip--live">Run end to end</span></time>
+          <div>
+            <h3>OpenEMR</h3>
+            <p>A medical record is the most regulated, most sensitive data most software ever holds. In this fork of OpenEMR, the widely used open source electronic health records system, a patient's name, Social Security number, address, phone and email are sealed before they reach the database, and open only for a clinician a quorum granted the reading role, even an administrator. It seals a large legacy PHP app with no ORM, showing the sidecar reaches any stack.</p>
           </div>
         </a>
       </div>
