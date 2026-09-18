@@ -362,3 +362,22 @@ article.post .demo, article.post .shot { margin: 30px 0; }
   .steps li { grid-template-columns: 30px minmax(0,1fr); gap: 16px; }
   .post-link { grid-template-columns: minmax(0,1fr); gap: 6px; }
 }
+
+/* ---------- integration grid: the ten apps as proof ---------- */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin: 8px 0 0; }
+.card {
+  display: block; padding: 22px 24px; border-radius: var(--block);
+  border: 1px solid transparent; background-origin: border-box; background-clip: padding-box, border-box;
+  background-image:
+    linear-gradient(var(--ground-2), var(--ground-2)),
+    linear-gradient(150deg, var(--edge-hi), rgba(255,255,255,0) 55%, var(--edge-lo));
+  box-shadow: var(--lift); text-decoration: none; color: inherit;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.card:hover { transform: translateY(-3px); }
+.card:hover h3 { color: var(--deep); }
+.card .cat { font-family: "IBM Plex Mono", monospace; font-size: .58rem; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+.card h3 { margin: 8px 0 10px; font-size: 1.12rem; display: flex; align-items: center; gap: 10px; transition: color .16s ease; }
+.card h3 .chip { flex: 0 0 auto; }
+.card p { margin: 0; font-size: .92rem; color: var(--ink-2); max-width: none; }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0,1fr); } }
