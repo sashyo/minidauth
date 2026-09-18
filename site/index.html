@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>minidauth: field-level encryption at rest, with a key nobody holds</title>
-<meta name="description" content="minidauth seals the sensitive fields in your app before they reach the database, with a key that is never assembled anywhere, not even to decrypt. It lives as shares across the Tide network, and reads are gated by quorum-granted roles. Proven in ten open-source apps across Node, Ruby, PHP and Python.">
+<meta name="description" content="minidauth takes the key out of your app: your database holds only ciphertext, a quorum decides who can read it and can revoke it instantly, and the completions that matter are signed by the network. The key lives as shares across the Tide network and is never assembled. Proven in ten open-source apps across Node, Ruby, PHP and Python.">
 <meta name="keywords" content="field-level encryption, encryption at rest, application-layer encryption, threshold cryptography, key management, data breach protection, quorum-granted roles, Postgres encryption, healthcare data encryption, self-hosted encryption">
 <link rel="canonical" href="https://www.dauth.me/">
 <meta property="og:type" content="website">
@@ -83,18 +83,16 @@
   <main>
 
     <header class="hero">
-      <p class="label">Field-level encryption at rest</p>
-      <h1>Your database holds <span>only ciphertext</span></h1>
+      <p class="label">A key nobody holds</p>
+      <h1>Seal it. <span>Govern it. Sign it.</span></h1>
       <p class="lede">
-        minidauth seals the sensitive fields in your app before they reach the database, with a key
-        that is never assembled anywhere, not even to decrypt.
+        minidauth takes the key out of your app. Your database holds only ciphertext, a quorum
+        decides who can read it and can revoke that in an instant, and the completions that matter
+        are signed by the network itself, with a key that never exists in one piece anywhere.
       </p>
       <p style="margin-top:18px">
-        The key exists only as shares across a network of independent machines, so no single one of
-        them, and not you either, ever holds the whole thing. A stolen database, or a leaked backup,
-        turns up nothing readable and no key to make it readable. We added it to
-        <a href="#apps">ten real open-source apps</a>, from a CRM to a health-records system,
-        without changing how anyone logs in.
+        We added it to <a href="#apps">ten real open-source apps</a>, from a CRM to a health-records
+        system, without changing how anyone logs in.
       </p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#apps">See the ten apps</a>
