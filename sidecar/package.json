@@ -1,0 +1,12 @@
+{
+  "name": "minidauth-seal",
+  "private": true,
+  "type": "module",
+  "description": "Keyless sealing sidecar: encrypts Formbricks response fields with minidauth so Postgres holds only ciphertext",
+  "scripts": {
+    "start": "node --import ./register.mjs server.mjs"
+  },
+  "dependencies": {
+    "@tideorg/js": "0.14.25"
+  }
+}

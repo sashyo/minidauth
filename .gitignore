@@ -19,3 +19,6 @@ vendor/
 .env
 data-tideless*/
 twenty-newperson.txt
+
+# Generated sealing key pair (private key must never be committed)
+keys/

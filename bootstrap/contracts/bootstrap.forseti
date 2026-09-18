@@ -1,0 +1,73 @@
+using Cryptide.Models;
+using Cryptide.Tools;
+using Ork.Forseti.Sdk;
+using Ork.Shared.Models.Contracts;
+
+/// <summary>
+/// The bootstrap policy, which replaces the authorizer pack and so has to do both of its jobs:
+/// sign attestation units, which every token needs, and sign Policy:1, so the real policies can
+/// still be deployed. A policy scoped to only one of those strands the key.
+///
+/// It is deployed over exactly those two models, and that scoping is what lets this stay simple:
+/// anything reaching here is either units or a policy, so finding no units means it is a policy.
+/// Units are allowed except the two ordinals that confer a role; policies are allowed, because
+/// authorising Policy:1 is the job.
+///
+/// So this does not stop whoever holds the host deploying another policy. It stops them handing
+/// themselves a role, which is the part a quorum is supposed to decide.
+///
+/// No fields, no statics, and no array literals: each compiles to a static constructor, and the
+/// Forseti VM refuses to load a contract that has one.
+/// </summary>
+public class Contract : IAccessPolicy
+{
+    public PolicyDecision ValidateData(DataContext context)
+    {
+        byte[] data = context.Data;
+        if (data == null || data.Length == 0)
+        {
+            return PolicyDecision.Deny("Nothing to inspect");
+        }
+
+        // Read unit_type straight out of the canonical CBOR rather than deserialising. 0x69 marks
+        // a 9 character text string, so "unit_type" appears verbatim, and ordinals below 24 are
+        // the single byte after it.
+        for (int i = 0; i + 10 < data.Length; i++)
+        {
+            if (data[i] != 0x69) continue;
+            if (data[i + 1] != 0x75) continue;  // u
+            if (data[i + 2] != 0x6E) continue;  // n
+            if (data[i + 3] != 0x69) continue;  // i
+            if (data[i + 4] != 0x74) continue;  // t
+            if (data[i + 5] != 0x5F) continue;  // _
+            if (data[i + 6] != 0x74) continue;  // t
+            if (data[i + 7] != 0x79) continue;  // y
+            if (data[i + 8] != 0x70) continue;  // p
+            if (data[i + 9] != 0x65) continue;  // e
+
+            byte unitType = data[i + 10];
+
+            // At or above 24 is a multi byte integer, which no unit type uses. Refuse rather than
+            // assume it is one of the harmless ones.
+            if (unitType >= 24)
+            {
+                return PolicyDecision.Deny("Unit type could not be read");
+            }
+
+            // 4 is role_definition, 7 is user_role_mapping_set. Both confer authority, so both go
+            // through a policy that requires approvals instead of this one.
+            if (unitType == 4 || unitType == 7)
+            {
+                return PolicyDecision.Deny("This policy does not sign units that confer roles");
+            }
+        }
+
+        return PolicyDecision.Allow();
+    }
+
+    // Never reached: this policy is IMPLICIT and PUBLIC.
+    public PolicyDecision ValidateExecutor(ExecutorContext context)
+    {
+        return PolicyDecision.Deny("This policy does not act for an executor");
+    }
+}

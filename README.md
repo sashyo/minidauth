@@ -103,6 +103,12 @@ set `MC_VOUCHER_PUBLIC_URL` to it instead.
 Then [bring up a vendor key](docs/running.md#bringing-up-a-vendor-key), and open the
 [notes demo](examples/notes) to watch it work.
 
+**Sealing an app's fields.** To seal database fields in one of the projects above (or your own),
+`docker compose -f docker-compose.yml -f docker-compose.seal.yml up` adds the sealing sidecar and a
+generated key, then `./bootstrap.sh` deploys the policies and grants a demo reader role. An app
+then only needs `MINIDAUTH_SEAL_URL=http://localhost:3021` and the key. See
+[docs/sealing.md](docs/sealing.md).
+
 ### Building from source
 
 The image carries Tide's `MidgardJava` jar, which Tide permits in a published image. Its source is

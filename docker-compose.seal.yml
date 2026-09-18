@@ -1,0 +1,63 @@
+# Field sealing, as an overlay on the base compose. Brings up the minidauth-seal sidecar and its
+# one-time key generation, and gives minidauth the operators file and the token-decrypt permission
+# that server-side sealing needs. Use it together with the base file:
+#
+#   cp operators.example.json operators.json        # a quorum of operators (dev tokens are fine)
+#   docker compose -f docker-compose.yml -f docker-compose.seal.yml up -d
+#
+# Then create a vendor key (needs a Tide licence, see docs/running.md) and run ./bootstrap.sh.
+# An app then only needs MINIDAUTH_SEAL_URL=http://localhost:3021 and the key in ./keys.
+services:
+  minidauth:
+    # The base service, extended: load the operators file (so a quorum can grant the reading role)
+    # and allow the token-gated decrypt the sidecar performs on a user's behalf.
+    environment:
+      MC_OPERATORS_FILE: /operators.json
+      MC_ALLOW_TOKEN_DECRYPT: "true"
+    volumes:
+      - ./operators.json:/operators.json:ro
+
+  keygen:
+    image: ghcr.io/sashyo/minidauth-seal:${MINIDAUTH_VERSION:-latest}
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.sidecar
+    platform: linux/amd64
+    entrypoint: ["node", "keygen.mjs"]
+    environment:
+      KEYS_DIR: /keys
+    volumes:
+      # Host-visible on purpose: an integration app mounts ./keys/usertoken.key to sign reader tokens.
+      - ./keys:/keys
+    restart: "no"
+
+  sidecar:
+    image: ghcr.io/sashyo/minidauth-seal:${MINIDAUTH_VERSION:-latest}
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.sidecar
+    platform: linux/amd64
+    ports:
+      - "3021:3021"
+    environment:
+      MINIDAUTH_URL: http://minidauth:8081
+      # A minidauth operator token that can voucher a decrypt. Defaults to the "ops" token in
+      # operators.example.json; set your own in a .env file next to this compose.
+      MINIDAUTH_OPS_TOKEN: "${MINIDAUTH_OPS_TOKEN:-ae78d0cd3accfa9ca957b19d938c501158e73831be839c08}"
+      MINIDAUTH_TOKEN: "${MINIDAUTH_OPS_TOKEN:-ae78d0cd3accfa9ca957b19d938c501158e73831be839c08}"
+      # The role a quorum must have granted the user for a field to open. Revoke it and reads stop.
+      MINIDAUTH_READER_ROLE: "${MINIDAUTH_READER_ROLE:-crm-reader}"
+      MINIDAUTH_ALLOW_SERVER_OPEN: "true"
+      MINIDAUTH_AUTH_MODE: "eddsa"
+      MINIDAUTH_AUTH_PUBLIC_KEY_FILE: /keys/authpub.b64
+      MINIDAUTH_AUTH_UID_CLAIM: "sub"
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      keygen:
+        condition: service_completed_successfully
+      minidauth:
+        condition: service_started
+    restart: unless-stopped

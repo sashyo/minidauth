@@ -1,0 +1,17 @@
+# The minidauth-seal sidecar: the language-agnostic sealing service every integration talks to.
+#
+# It holds no key and no reading identity of its own. It seals on /seal and, on /open, decrypts
+# strictly on behalf of the end user named in a verified token, gated by minidauth's quorum grant.
+# Published so this compose works on its own, with nothing to build.
+FROM node:22-alpine
+WORKDIR /app
+
+# Only the sidecar's own runtime files and its one dependency (@tideorg/js). No app code.
+COPY sidecar/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+COPY sidecar/*.mjs ./
+COPY docker/sidecar-entrypoint.sh /usr/local/bin/sidecar-entrypoint.sh
+RUN chmod +x /usr/local/bin/sidecar-entrypoint.sh
+
+EXPOSE 3021
+ENTRYPOINT ["/usr/local/bin/sidecar-entrypoint.sh"]

@@ -1,0 +1,69 @@
+using Cryptide.Models;
+using Cryptide.Tools;
+using Ork.Forseti.Sdk;
+using Ork.Shared.Models.Contracts;
+
+/// <summary>
+/// Open to write, governed to read.
+///
+/// Encryption runs under a PUBLIC, IMPLICIT policy, so neither ValidateApprovers nor
+/// ValidateExecutor is reached and anyone may encrypt, including someone with no identity at
+/// all. Decryption runs under a PRIVATE policy, which is what makes ValidateExecutor run and
+/// the role decide.
+///
+/// The role is read from the policy parameters rather than hardcoded, so the same contract
+/// serves any deployment and renaming a role does not mean recompiling.
+///
+/// ValidateApprovers is deliberately not implemented. The SDK defaults it to Deny, so if this
+/// contract is ever attached to an EXPLICIT policy it refuses rather than waving approvals
+/// through.
+/// </summary>
+public class Contract : IAccessPolicy
+{
+    public PolicyDecision ValidateData(DataContext context)
+    {
+        return PolicyDecision.Allow();
+    }
+
+    /// <summary>
+    /// The whole access decision.
+    ///
+    /// Reached only on a PRIVATE policy, and only after the ORK has verified the doken against
+    /// this vendor key and checked its expiry and audience. So the roles read here are ones the
+    /// cohort put in the token, not ones a caller asserted.
+    /// </summary>
+    public PolicyDecision ValidateExecutor(ExecutorContext context)
+    {
+        if (context.Doken == null)
+        {
+            return PolicyDecision.Deny("No executor doken was presented");
+        }
+        if (context.Doken.Payload == null)
+        {
+            return PolicyDecision.Deny("Executor doken carried no payload");
+        }
+
+        string role;
+        try
+        {
+            role = context.Policy.Params.GetParameter<string>("role");
+        }
+        catch
+        {
+            // A policy with no role parameter cannot express who may read, so it grants nothing.
+            return PolicyDecision.Deny("Policy does not name a role");
+        }
+
+        if (string.IsNullOrEmpty(role))
+        {
+            return PolicyDecision.Deny("Policy names an empty role");
+        }
+
+        if (!context.Doken.Payload.RealmAccessRoleExists(role))
+        {
+            return PolicyDecision.Deny("Executor does not hold " + role);
+        }
+
+        return PolicyDecision.Allow();
+    }
+}

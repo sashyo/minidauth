@@ -32,6 +32,13 @@ LABEL org.opencontainers.image.source="https://github.com/sashyo/minidauth" \
       org.opencontainers.image.description="Give your existing login a key that nobody holds."
 WORKDIR /app
 
+# MidgardJava's native library links libicu. Without it the service boots but dies the moment it
+# does crypto (server-side sealing), with a .NET "Couldn't find a valid ICU package" message. The
+# JRE base image does not carry it, so install it here.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libicu-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Not root: nothing here needs it, and the data directory holds the vendor key.
 RUN useradd --system --uid 10001 --create-home minidauth
 COPY --from=build /src/target/minidauth.jar ./minidauth.jar
