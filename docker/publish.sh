@@ -28,14 +28,20 @@ docker build --platform linux/amd64 "${LABELS[@]}" -t "$IMAGE:$VERSION" -t "$IMA
 docker build --platform linux/amd64 "${LABELS[@]}" -f docker/Dockerfile.tunnel \
   -t "$IMAGE-tunnel:$VERSION" -t "$IMAGE-tunnel:latest" .
 
+# The sealing sidecar, so docker-compose.seal.yml works on a pull without a local build. It carries
+# no jar and no key; see docker/Dockerfile.sidecar and docs/sealing.md.
+docker build --platform linux/amd64 "${LABELS[@]}" -f docker/Dockerfile.sidecar \
+  -t "$IMAGE-seal:$VERSION" -t "$IMAGE-seal:latest" .
+
 if [ "${PUSH:-}" = "1" ]; then
   for tag in "$VERSION" latest; do
     docker push "$IMAGE:$tag"
     docker push "$IMAGE-tunnel:$tag"
+    docker push "$IMAGE-seal:$tag"
   done
-  echo "Pushed $IMAGE and $IMAGE-tunnel at $VERSION"
+  echo "Pushed $IMAGE, $IMAGE-tunnel and $IMAGE-seal at $VERSION"
 else
   echo
-  echo "Built $IMAGE:$VERSION and $IMAGE-tunnel:$VERSION"
+  echo "Built $IMAGE:$VERSION, $IMAGE-tunnel:$VERSION and $IMAGE-seal:$VERSION"
   echo "Push with: PUSH=1 VERSION=$VERSION docker/publish.sh"
 fi

@@ -224,7 +224,7 @@ to confuse and the difference is expensive.
 ## Distributing an image
 
 The quickest way to let somebody try minidauth is a published image: no Java, no Maven, no hunting
-for a jar. `docker/publish.sh` builds and tags two, the service and the tunnel, and `PUSH=1` sends
+for a jar. `docker/publish.sh` builds and tags three, the service, the tunnel and the sealing sidecar, and `PUSH=1` sends
 them to `ghcr.io/sashyo`.
 
 The service image contains `MidgardJava`, compiled and unmodified. Tide permits that. What it does
