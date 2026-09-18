@@ -672,7 +672,6 @@ def projects_index():
     n_apps = len(PROJ)
     body = f"""
     <header class="hero">
-      <p class="label">Field-level encryption at rest, proven</p>
       <h1>{n_apps} open-source apps <span>whose database can't read itself</span></h1>
       <p class="lede">
         Not demos. Real projects with their own logins and their own databases, forked and made to
